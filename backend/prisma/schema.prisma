@@ -1,0 +1,80 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  username     String   @unique
+  password     String
+  email        String?  @unique
+  name         String?
+  role         String   @default("CHILD") // CHILD, PARENT
+  familyId     String?
+  family       Family?  @relation(fields: [familyId], references: [id])
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  seeds        Seed[]
+  chatRooms    ChatRoom[]
+  diaries      Diary[]
+}
+
+model Family {
+  id        String   @id @default(uuid())
+  name      String
+  members   User[]
+  createdAt DateTime @default(now())
+}
+
+model Seed {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  bookTitle   String
+  author      String?
+  coverImage  String?
+  sentence    String
+  inputType   String   @default("MANUAL")
+  createdAt   DateTime @default(now())
+  chatRoom    ChatRoom?
+}
+
+model ChatRoom {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id])
+  seedId    String   @unique
+  seed      Seed     @relation(fields: [seedId], references: [id])
+  status    String   @default("ACTIVE")
+  createdAt DateTime @default(now())
+  messages  ChatMessage[]
+  diary     Diary?
+}
+
+model ChatMessage {
+  id         String   @id @default(uuid())
+  chatRoomId String
+  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id])
+  sender     String
+  content    String
+  createdAt  DateTime @default(now())
+}
+
+model Diary {
+  id         String   @id @default(uuid())
+  userId     String
+  user       User     @relation(fields: [userId], references: [id])
+  chatRoomId String   @unique
+  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id])
+  content    String
+  emotion    String?
+  imageUrl   String?
+  keywords   String?
+  summary    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
