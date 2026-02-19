@@ -131,13 +131,24 @@ const AIChatScreen = ({ route, navigation }: any) => {
             isUser: true,
         };
 
-        setMessages(prev => [...prev, newUserMessage]);
+        const updatedMessages = [...messages, newUserMessage];
+        setMessages(updatedMessages);
         setInputText('');
         setLoading(true);
 
         try {
+            // Map messages to the history format for the AI (excluding the last one which is sent separately or included)
+            // The backend expects history to be the PREVIOUS messages.
+            const apiHistory = messages.map(msg => ({
+                role: msg.isUser ? 'user' : 'assistant' as 'user' | 'assistant',
+                content: msg.text
+            }));
+
             const response = await axios.post(`${API_URL}/chat/${chatRoomId}/message`, {
                 message: userMsgText,
+                history: apiHistory,
+                sentence: seed.sentence,
+                plot: book?.summary
             });
 
             setMessages(prev => [...prev, {
@@ -145,9 +156,6 @@ const AIChatScreen = ({ route, navigation }: any) => {
                 text: response.data.content,
                 isUser: false,
             }]);
-
-            // If AI says something about making a diary, we might enable a button
-            // For MVP, if messages.length > 4, show "일기 만들기" button
         } catch (error) {
             console.error('Error sending message:', error);
             Alert.alert('오류', '메시지를 보내지 못했어요.');

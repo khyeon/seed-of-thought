@@ -13,8 +13,14 @@ export class ChatController {
     @Post(':id/message')
     async sendMessage(
         @Param('id') chatRoomId: string,
-        @Body() body: { message: string },
+        @Body() body: { message: string, history: any[], sentence: string, plot?: string },
     ) {
-        return this.chatService.sendMessage(chatRoomId, body.message);
+        return this.chatService.sendMessage(
+            chatRoomId,
+            body.message,
+            body.history,
+            body.sentence,
+            body.plot
+        );
     }
 }
