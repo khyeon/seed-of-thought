@@ -40,6 +40,7 @@ export class BooksService {
                 publisher: book.publisher,
                 thumbnail: book.thumbnail,
                 isbn: book.isbn,
+                summary: book.contents, // Kakao API provides plot summary in 'contents'
             }));
         } catch (error: any) {
             console.error('BooksService.search: Kakao API Error:', error.response?.data || error.message);

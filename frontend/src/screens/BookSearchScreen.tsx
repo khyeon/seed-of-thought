@@ -105,6 +105,7 @@ const BookSearchScreen = ({ navigation }: any) => {
                 title: book.title,
                 author: book.authors?.join(', ') || '작자미상',
                 thumbnail: book.thumbnail || 'https://via.placeholder.com/60x90?text=No+Image',
+                summary: book.summary, // Pass the summary from backend
             }));
 
             setBooks(formattedBooks);

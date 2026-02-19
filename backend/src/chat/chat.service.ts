@@ -29,7 +29,7 @@ export class ChatService {
     - 대화가 산으로 갈 때: 언제든 "우리가 아까 무슨 이야기를 했지? 아! [원래 문장] 이야기였지!"라며 중심을 잡아.
     `;
 
-    async startConversation(userId: string, seedId: string) {
+    async startConversation(userId: string, seedId: string, bookContext?: string) {
         const seed = await this.prisma.seed.findUnique({ where: { id: seedId } });
         if (!seed) throw new HttpException('Seed not found', HttpStatus.NOT_FOUND);
 
@@ -37,22 +37,23 @@ export class ChatService {
             data: { userId, seedId, status: 'ACTIVE' },
         });
 
-        // 1단계 시작: 상황 컨텍스트 주입
+        // 1단계 시작: 상황 컨텍스트 주입 (줄거리 정보 추가)
         const initialContext = `
       [독서 정보]
       - 책 제목: '${seed.bookTitle}'
       - 선택 문장: "${seed.sentence}"
+      ${bookContext ? `- 책 줄거리: "${bookContext}"` : ''}
       
       [미션]
       위 문장에 대해 아이에게 다정한 첫마디를 건네줘. 
-      문장에 공감하고, 왜 이 문장이 눈길을 끌었는지 궁금해하는 질문을 해줘.
+      아이가 선택한 문장과 책의 줄거리를 잘 연결해서 문장에 공감해주고, 왜 이 문장이 눈길을 끌었는지 궁금해하는 질문을 해줘.
     `;
 
-        const response = await this.sendMessage(chatRoom.id, initialContext);
+        const response = await this.sendMessage(chatRoom.id, initialContext, true);
         return { chatRoomId: chatRoom.id, message: response };
     }
 
-    async sendMessage(chatRoomId: string, prompt: string) {
+    async sendMessage(chatRoomId: string, prompt: string, isInitialSystemPrompt: boolean = false) {
         try {
             const chatRoom = await this.prisma.chatRoom.findUnique({
                 where: { id: chatRoomId },
@@ -66,20 +67,17 @@ export class ChatService {
                 orderBy: { createdAt: 'asc' },
             });
 
-            const isInitialPrompt = history.length === 0 && prompt.includes('[독서 정보]');
-
-            if (!isInitialPrompt) {
-                await this.prisma.chatMessage.create({
-                    data: { chatRoomId, sender: 'USER', content: prompt },
-                });
-            }
+            // Save the prompt to history (both user messages and the initial system context)
+            await this.prisma.chatMessage.create({
+                data: { chatRoomId, sender: isInitialSystemPrompt ? 'SYSTEM' : 'USER', content: prompt },
+            });
 
             if (!this.groq) return this.getMockResponse(chatRoomId);
 
             // 단계별 가이드라인 + 문맥 유지(Context Anchoring)
             let stageInstruction = `\n[절대 잊지 마] 지금 대화의 중심 문장은 "${chatRoom.seed.sentence}"이야.`;
 
-            if (history.length === 0) {
+            if (isInitialSystemPrompt || history.length === 0) {
                 stageInstruction += "\n[지침] 대화 시작: 문장에 공감하고 아이의 첫 느낌을 물어봐.";
             } else if (history.length >= 6) {
                 stageInstruction += "\n[지침] 대화 마무리: 아이의 생각을 한 문장으로 요약해 칭찬하고, 기록을 부드럽게 권유해.";
@@ -91,14 +89,22 @@ export class ChatService {
                 { role: 'system', content: this.AI_PERSONA + stageInstruction },
             ];
 
-            history.forEach(msg => {
-                messages.push({
-                    role: msg.sender === 'USER' ? 'user' : 'assistant',
-                    content: msg.content
-                });
+            // Re-fetch all messages to include the one we just saved
+            const allMessages = await this.prisma.chatMessage.findMany({
+                where: { chatRoomId },
+                orderBy: { createdAt: 'asc' },
             });
 
-            messages.push({ role: 'user', content: prompt });
+            allMessages.forEach(msg => {
+                if (msg.sender === 'SYSTEM') {
+                    messages.push({ role: 'user', content: msg.content });
+                } else {
+                    messages.push({
+                        role: msg.sender === 'USER' ? 'user' : 'assistant',
+                        content: msg.content
+                    });
+                }
+            });
 
             const completion = await this.groq.chat.completions.create({
                 messages: messages,

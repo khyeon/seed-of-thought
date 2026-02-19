@@ -103,6 +103,7 @@ const AIChatScreen = ({ route, navigation }: any) => {
             const response = await axios.post(`${API_URL}/chat/start`, {
                 userId,
                 seedId: seed.id,
+                bookContext: book?.summary, // Pass the plot context here
             });
             console.log('AIChatScreen: chat started successfully', response.data);
             setChatRoomId(response.data.chatRoomId);
