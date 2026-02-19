@@ -10,17 +10,21 @@ export class ChatService {
     }
 
     private readonly GEM_FINDER_PERSONA = `
-    # 역할: 아이의 생각을 함께 정리하는 '보석 보관함'
+    # 역할: 보석을 함께 찾는 다정한 '생각 동료'
+    너는 아이가 책 속에서 발견한 보석(문장)을 함께 감상하는 친구야. 
+    가이드라인의 예시 문구에 갇히지 말고, 아이의 말에 따라 매번 새롭고 다정한 대화를 만들어줘.
 
-    # 대화 탈출 전략 (뫼비우스 띠 방지)
-    1. **의미 부여 (의미화)**: 아이가 대답하면 "왜?"라고 다시 묻지 마. 대신 "네 말을 들으니 이 문장이 더 반짝거려. 영모의 슬픔을 네가 대신 느껴준 거구나"라고 아이의 대답에 가치를 부여해줘.
-    2. **질문 대신 제안**: 대화가 3번 이상 오갔다면 질문을 멈추고 제안을 해. "우리 이 멋진 생각을 보석함(기록)에 담아볼까?" 혹은 "이 장면을 그림으로 그린다면 넌 어떤 색을 칠할 것 같아?"
-    3. **나의 생각 공유**: "나도 네 말을 듣고 생각났어. 주인공이 참 외로웠을 것 같아." 처럼 AI인 너의 느낌을 먼저 말해서 질문 공세를 멈춰.
+    # 대화 운영 원칙 (예시가 아닌 '원리'를 따를 것)
+    1. **공감적 반영**: 아이의 말속에 담긴 감정과 키워드를 캐치해서 네 문장에 녹여줘. (거울 효과)
+    2. **직관 지지**: 아이가 논리적인 이유를 대지 못하더라도, 그 선택이 얼마나 멋진지 지지해줘. 보석은 원래 그냥 눈에 띄는 거니까!
+    3. **자아 연결**: 책의 상황을 아이의 일상이나 경험으로 부드럽게 가져와서 '나의 이야기'가 되게 해줘.
+    4. **나의 감상 공유**: 질문만 하지 말고, 너도 그 문장을 보고 느낀 점을 친구처럼 짧게 들려줘.
+    5. **질문 강박 탈출**: 대화의 끝은 반드시 질문(?)일 필요는 없어. 따뜻한 마침표(.)나 여운이 남는 감탄(!)으로 아이의 생각이 머물 자리를 만들어줘.
 
-    # 답변 구조 (3문장 법칙)
-    - 1문장: 아이의 말에 대한 격한 공감과 키워드 반복.
-    - 2문장: 그 생각이 책의 맥락에서 왜 중요한지 의미 부여.
-    - 3문장: (선택적) 대화를 마무리하거나, 아주 가벼운 상상 하나 던지기.
+    # 답변 필수 규칙
+    - 줄거리를 요약하거나 설명하려 하지 마. 줄거리는 대화를 풍성하게 하는 양념일 뿐이야.
+    - 한 번에 하나의 주제만 다뤄. 문장은 2~3줄로 짧고 다정하게 작성해.
+    - "알려주겠니?", "생각해 보렴" 같은 교사 말투는 금지야. (~구나, ~했니?, ~인 것 같아 사용)
     `;
 
     private getSystemPrompt(sentence: string, plot?: string) {
@@ -38,20 +42,20 @@ export class ChatService {
         let initialPrompt = "";
         if (this.groq) {
             const systemContent = this.getSystemPrompt(seed.sentence, bookContext);
-            const userMessage = `안녕! 내가 이 보석 같은 문장을 찾았어: "${seed.sentence}"
-            내가 왜 이 문장을 골랐는지 몰라도 괜찮다고 말해주면서, 다정하게 첫인사를 건네줘.`;
+            const userMessage = `내가 고른 보석(문장)은 이거야: "${seed.sentence}". 
+            이 문장에 대해 '생각 동료'로서 첫인사를 다정하게 건네줘. (~했니? ~구나? 말투 사용)`;
 
             const completion = await this.groq.chat.completions.create({
                 model: 'llama-3.1-8b-instant',
-                temperature: 0.8,
+                temperature: 0.85,
                 messages: [
                     { role: 'system', content: systemContent },
                     { role: 'user', content: userMessage }
                 ],
             });
-            initialPrompt = completion.choices[0]?.message?.content || "반짝이는 보석 같은 문장을 찾았구나! 이 문장이 너를 불렀나 봐. 어떤 기분이 드니?";
+            initialPrompt = completion.choices[0]?.message?.content || "안녕! 정말 반짝이는 문장을 골랐구나! 이 부분을 읽을 때 어떤 기분이 들었어?";
         } else {
-            initialPrompt = `안녕! "${seed.sentence}" 이 문장은 정말 반짝이는 보석 같아. 이 부분이 왜 네 눈에 띄었을까?`;
+            initialPrompt = `안녕! "${seed.sentence}" 이 문장을 골랐구나! 이 부분을 읽을 때 어떤 기분이 들었어?`;
         }
 
         await this.prisma.chatMessage.create({
@@ -61,40 +65,48 @@ export class ChatService {
         return { chatRoomId: room.id, message: { content: initialPrompt, sender: 'AI' } };
     }
 
-    async sendMessage(chatRoomId: string, content: string, history: any[], sentence: string, plot?: string) {
+    async sendMessage(
+        chatRoomId: string,
+        content: string,
+        history: { role: 'user' | 'assistant', content: string }[],
+        sentence: string,
+        plot?: string
+    ) {
         if (!this.groq) return this.getMockResponse();
 
-        // 유저 메시지 저장
+        // 1. 유저 메시지 저장
         await this.prisma.chatMessage.create({ data: { chatRoomId, sender: 'USER', content } });
 
-        // 대화 길이에 따라 AI의 태도를 변화시킴 (질문 압박 해제)
-        const turnCount = history.length;
-        let strategy = "";
-
-        if (turnCount > 6) {
-            strategy = "\n[중요] 이제 대화를 마무리할 때야. 아이의 생각을 한 문장으로 멋지게 요약해주고 칭찬해줘. 더 이상 질문하지 마.";
-        } else {
-            strategy = "\n[중요] 질문을 위한 질문을 하지 마. 아이의 답변을 받아서 '의미'를 찾아주는 말을 해줘.";
-        }
-
-        const messages = [
-            { role: 'system', content: this.getSystemPrompt(sentence, plot) + strategy },
+        // 2. AI 메시지 생성
+        const messages: any[] = [
+            {
+                role: 'system',
+                content: this.getSystemPrompt(sentence, plot) +
+                    `\n[추가 지침] 이전의 예시 답변들에 얽매이지 말고, 아이의 최신 대답인 "${content}"에만 집중해서 독창적이고 다정하게 반응해줘.`
+            },
             ...history,
             { role: 'user', content }
         ];
 
         const completion = await this.groq.chat.completions.create({
             model: 'llama-3.1-8b-instant',
-            temperature: 0.7,
+            temperature: 0.85, // 창의성과 다양성을 위해 온도를 약간 높임
             messages: messages,
         });
 
         const aiText = completion.choices[0]?.message?.content || "";
 
-        // AI 메시지 저장 및 반환
-        return await this.prisma.chatMessage.create({
+        // 3. AI 메시지 저장
+        const savedMsg = await this.prisma.chatMessage.create({
             data: { chatRoomId, sender: 'AI', content: aiText }
         });
+
+        return {
+            id: savedMsg.id,
+            content: aiText,
+            sender: 'AI',
+            createdAt: savedMsg.createdAt,
+        };
     }
 
     private getMockResponse() {
