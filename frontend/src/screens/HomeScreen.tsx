@@ -2,7 +2,9 @@ import React from 'react';
 import { ScrollView, View, Text, TouchableOpacity } from 'react-native';
 import styled from 'styled-components/native';
 import { theme } from '../styles/theme';
-import { Plus, Settings } from 'lucide-react-native';
+import { Plus, Settings, BookOpen, CheckCircle, List } from 'lucide-react-native';
+import { useUserStore } from '../store/userStore';
+import axios from 'axios';
 import { API_URL } from '../config/apiConfig';
 
 const Container = styled.SafeAreaView`
@@ -29,48 +31,90 @@ const SubGreeting = styled.Text`
   margin-top: ${theme.spacing.xs}px;
 `;
 
-const CharacterContainer = styled.View`
-  align-items: center;
-  margin-vertical: ${theme.spacing.xxl}px;
+const DashboardContainer = styled.View`
+  padding: ${theme.spacing.lg}px;
 `;
 
-const SeedlingPlaceholder = styled.View`
-  width: 150px;
-  height: 150px;
-  background-color: ${theme.colors.secondary};
-  border-radius: 75px;
-  justify-content: center;
-  align-items: center;
-`;
-
-const PlantButton = styled.TouchableOpacity`
-  background-color: ${theme.colors.primary};
-  margin-horizontal: ${theme.spacing.lg}px;
-  padding: ${theme.spacing.md}px;
-  border-radius: ${theme.borderRadius.full}px;
+const StatRow = styled.View`
   flex-direction: row;
-  justify-content: center;
+  justify-content: space-between;
+  margin-bottom: ${theme.spacing.lg}px;
+`;
+
+const StatCard = styled.TouchableOpacity`
+  background-color: ${theme.colors.white};
+  width: 48%;
+  padding: ${theme.spacing.lg}px;
+  border-radius: ${theme.borderRadius.lg}px;
   align-items: center;
   ${theme.shadows.soft};
 `;
 
-const ButtonText = styled.Text`
-  color: ${theme.colors.white};
+const StatCount = styled.Text`
+  font-size: 32px;
+  font-weight: bold;
+  color: ${theme.colors.primary};
+`;
+
+const StatLabel = styled.Text`
+  font-size: 14px;
+  color: ${theme.colors.text.secondary};
+  margin-top: 4px;
+`;
+
+const MainActionCard = styled.TouchableOpacity<{ primary?: boolean }>`
+  background-color: ${props => props.primary ? theme.colors.primary : theme.colors.white};
+  padding: ${theme.spacing.lg}px;
+  border-radius: ${theme.borderRadius.lg}px;
+  flex-direction: row;
+  align-items: center;
+  margin-bottom: ${theme.spacing.md}px;
+  border-width: ${props => props.primary ? 0 : 1}px;
+  border-color: ${theme.colors.primary};
+  ${theme.shadows.soft};
+`;
+
+const ActionIconContainer = styled.View<{ primary?: boolean }>`
+  width: 50px;
+  height: 50px;
+  background-color: ${props => props.primary ? 'rgba(255,255,255,0.2)' : theme.colors.secondary};
+  border-radius: 25px;
+  justify-content: center;
+  align-items: center;
+`;
+
+const ActionTextContainer = styled.View`
+  margin-left: ${theme.spacing.md}px;
+  flex: 1;
+`;
+
+const ActionTitle = styled.Text<{ primary?: boolean }>`
   font-size: 18px;
   font-weight: bold;
-  margin-left: ${theme.spacing.sm}px;
+  color: ${props => props.primary ? theme.colors.white : theme.colors.text.primary};
+`;
+
+const ActionDesc = styled.Text<{ primary?: boolean }>`
+  font-size: 13px;
+  color: ${props => props.primary ? 'rgba(255,255,255,0.8)' : theme.colors.text.secondary};
+  margin-top: 2px;
+`;
+
+const RecentHeader = styled.View`
+  flex-direction: row;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: ${theme.spacing.md}px;
 `;
 
 const RecentTitle = styled.Text`
   font-size: 20px;
   font-weight: bold;
   color: ${theme.colors.text.primary};
-  margin: ${theme.spacing.lg}px;
 `;
 
 const DiaryCard = styled.View`
   background-color: ${theme.colors.white};
-  margin-horizontal: ${theme.spacing.lg}px;
   margin-bottom: ${theme.spacing.md}px;
   padding: ${theme.spacing.md}px;
   border-radius: ${theme.borderRadius.md}px;
@@ -105,30 +149,38 @@ const DiaryDate = styled.Text`
   margin-top: 2px;
 `;
 
-import { useUserStore } from '../store/userStore';
-import axios from 'axios';
-
 const HomeScreen = ({ navigation }: any) => {
   const { userName, role, userId, clearUser } = useUserStore();
   const [children, setChildren] = React.useState<any[]>([]);
+  const [counts, setCounts] = React.useState({ READING: 0, COMPLETED: 0 });
 
-  // Function to refine name by removing surname
   const refineName = (name: string | null) => {
     if (!name) return '';
-    // If name is 3+ chars (like '김승찬'), assume first char is surname
-    if (name.length >= 3) {
-      return name.slice(1);
-    }
+    if (name.length >= 3) return name.slice(1);
     return name;
   };
 
   const displayName = React.useMemo(() => refineName(userName), [userName]);
 
   React.useEffect(() => {
-    if (role === 'PARENT') {
-      fetchFamily();
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (role === 'PARENT') {
+        fetchFamily();
+      } else {
+        fetchCounts();
+      }
+    });
+    return unsubscribe;
+  }, [navigation, role]);
+
+  const fetchCounts = async () => {
+    try {
+      const response = await axios.get(`${API_URL}/user-books/counts?userId=${userId}`);
+      setCounts(response.data);
+    } catch (e) {
+      console.error('Failed to fetch counts', e);
     }
-  }, [role]);
+  };
 
   const fetchFamily = async () => {
     try {
@@ -161,37 +213,56 @@ const HomeScreen = ({ navigation }: any) => {
         </Header>
 
         {role === 'CHILD' ? (
-          <>
-            <CharacterContainer>
-              <SeedlingPlaceholder>
-                <Text style={{ fontSize: 60 }}>🌱</Text>
-              </SeedlingPlaceholder>
-            </CharacterContainer>
+          <DashboardContainer>
+            <StatRow>
+              <StatCard onPress={() => navigation.navigate('ReadingList')}>
+                <StatCount>{counts.READING}</StatCount>
+                <StatLabel>읽고 있는 책</StatLabel>
+              </StatCard>
+              <StatCard onPress={() => navigation.navigate('CompletedList')}>
+                <StatCount>{counts.COMPLETED}</StatCount>
+                <StatLabel>다 읽은 책</StatLabel>
+              </StatCard>
+            </StatRow>
 
-            <PlantButton activeOpacity={0.8} onPress={() => navigation.navigate('BookSearch')}>
-              <Plus size={24} color={theme.colors.white} />
-              <ButtonText>오늘 최고의 문장 심기</ButtonText>
-            </PlantButton>
+            <MainActionCard primary onPress={() => navigation.navigate('BookSelection')}>
+              <ActionIconContainer primary>
+                <BookOpen size={24} color={theme.colors.white} />
+              </ActionIconContainer>
+              <ActionTextContainer>
+                <ActionTitle primary>오늘 최고의 문장 심기</ActionTitle>
+                <ActionDesc primary>함께 읽은 책에서 보석 같은 문장을 찾아봐요</ActionDesc>
+              </ActionTextContainer>
+            </MainActionCard>
 
-            <RecentHeader>
-              <RecentTitle>나의 일기장</RecentTitle>
-              <TouchableOpacity onPress={() => navigation.navigate('Archive')}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <MainActionCard onPress={() => navigation.navigate('BookSearch')}>
+              <ActionIconContainer>
+                <Plus size={24} color={theme.colors.primary} />
+              </ActionIconContainer>
+              <ActionTextContainer>
+                <ActionTitle>읽을 책 담기</ActionTitle>
+                <ActionDesc>새로운 책을 내 서재에 추가해 보세요</ActionDesc>
+              </ActionTextContainer>
+            </MainActionCard>
+
+            <View style={{ marginTop: 20 }}>
+              <RecentHeader>
+                <RecentTitle>최근 나의 생각</RecentTitle>
+                <TouchableOpacity onPress={() => navigation.navigate('Archive')}>
                   <Text style={{ color: theme.colors.primary, fontWeight: 'bold' }}>전체보기</Text>
-                </View>
-              </TouchableOpacity>
-            </RecentHeader>
-
-            <DiaryCard as={TouchableOpacity} activeOpacity={0.7} onPress={() => navigation.navigate('Archive')}>
-              <DiaryIcon><Text style={{ fontSize: 24 }}>🍏</Text></DiaryIcon>
-              <DiaryInfo>
-                <DiaryTitle>내 생각들이 열매를 맺고 있어요</DiaryTitle>
-                <DiaryDate>아래 '전체보기'에서 확인해봐요!</DiaryDate>
-              </DiaryInfo>
-            </DiaryCard>
-          </>
+                </TouchableOpacity>
+              </RecentHeader>
+              <DiaryCard as={TouchableOpacity} activeOpacity={0.7} onPress={() => navigation.navigate('Archive')}>
+                <DiaryIcon><Text style={{ fontSize: 24 }}>🍏</Text></DiaryIcon>
+                <DiaryInfo>
+                  <DiaryTitle>내 생각들이 열매를 맺고 있어요</DiaryTitle>
+                  <DiaryDate>보관소에서 확인해봐요!</DiaryDate>
+                </DiaryInfo>
+              </DiaryCard>
+            </View>
+          </DashboardContainer>
         ) : (
-          <View style={{ marginTop: 20 }}>
+          <View style={{ marginTop: 20, paddingHorizontal: 20 }}>
             <RecentTitle>자녀 리포트 확인</RecentTitle>
             {children.length > 0 ? (
               children.map(child => (
@@ -204,7 +275,7 @@ const HomeScreen = ({ navigation }: any) => {
                 </DiaryCard>
               ))
             ) : (
-              <Text style={{ marginHorizontal: 20, color: theme.colors.text.disabled }}>등록된 자녀가 없습니다.</Text>
+              <Text style={{ marginTop: 10, color: theme.colors.text.disabled }}>등록된 자녀가 없습니다.</Text>
             )}
           </View>
         )}
@@ -212,36 +283,5 @@ const HomeScreen = ({ navigation }: any) => {
     </Container>
   );
 };
-
-const RecentHeader = styled.View`
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  padding-right: ${theme.spacing.lg}px;
-`;
-
-const ReportCard = styled.TouchableOpacity`
-  background-color: ${theme.colors.secondary};
-  margin: ${theme.spacing.lg}px;
-  padding: ${theme.spacing.lg}px;
-  border-radius: ${theme.borderRadius.lg}px;
-  flex-direction: row;
-  justify-content: space-between;
-  align-items: center;
-  border-left-width: 5px;
-  border-left-color: ${theme.colors.primary};
-`;
-
-const ReportTitle = styled.Text`
-  font-size: 16px;
-  font-weight: bold;
-  color: ${theme.colors.text.primary};
-`;
-
-const ReportDesc = styled.Text`
-  font-size: 12px;
-  color: ${theme.colors.text.secondary};
-  margin-top: 4px;
-`;
 
 export default HomeScreen;

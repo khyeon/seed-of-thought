@@ -133,9 +133,17 @@ export class DiariesService {
         });
     }
 
-    async getDiariesByUser(userId: string) {
+    async getDiariesByUser(userId: string, bookTitle?: string) {
+        const where: any = { userId };
+        if (bookTitle) {
+            where.chatRoom = {
+                seed: {
+                    bookTitle: bookTitle,
+                },
+            };
+        }
         return this.prisma.diary.findMany({
-            where: { userId },
+            where,
             orderBy: { createdAt: 'desc' },
             include: {
                 chatRoom: {

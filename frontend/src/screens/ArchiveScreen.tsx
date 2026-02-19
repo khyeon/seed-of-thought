@@ -78,17 +78,22 @@ const ArchiveScreen = ({ navigation, route }: any) => {
 
     const [diaries, setDiaries] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+    const bookTitleFilter = route.params?.bookTitle;
 
     useEffect(() => {
         const unsubscribe = navigation.addListener('focus', () => {
             fetchDiaries();
         });
         return unsubscribe;
-    }, [navigation, targetUserId]);
+    }, [navigation, targetUserId, bookTitleFilter]);
 
     const fetchDiaries = async () => {
+        setLoading(true);
         try {
-            const response = await axios.get(`${API_URL}/diaries?userId=${targetUserId}`);
+            const url = bookTitleFilter
+                ? `${API_URL}/diaries?userId=${targetUserId}&bookTitle=${encodeURIComponent(bookTitleFilter)}`
+                : `${API_URL}/diaries?userId=${targetUserId}`;
+            const response = await axios.get(url);
             setDiaries(response.data);
         } catch (error) {
             console.error('Error fetching diaries:', error);

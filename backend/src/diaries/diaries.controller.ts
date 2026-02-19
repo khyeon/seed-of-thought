@@ -17,8 +17,8 @@ export class DiariesController {
     }
 
     @Get()
-    async findAll(@Query('userId') userId: string) {
-        return this.diariesService.getDiariesByUser(userId);
+    async findAll(@Query('userId') userId: string, @Query('bookTitle') bookTitle?: string) {
+        return this.diariesService.getDiariesByUser(userId, bookTitle);
     }
 
     @Get('report')

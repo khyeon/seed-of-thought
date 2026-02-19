@@ -84,51 +84,60 @@ const BookAuthor = styled.Text`
 
 import axios from 'axios';
 import { API_URL } from '../config/apiConfig';
+import { useUserStore } from '../store/userStore';
 
 const BookSearchScreen = ({ navigation }: any) => {
+    const { userId } = useUserStore();
     const [query, setQuery] = useState('');
     const [books, setBooks] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
+    const [adding, setAdding] = useState(false);
 
     const handleSearch = async () => {
         if (!query.trim()) return;
         setLoading(true);
         try {
             const searchUrl = `${API_URL}/books/search?query=${query}`;
-            console.log('AIChat - search: Calling URL:', searchUrl);
             const response = await axios.get(searchUrl);
-            console.log('AIChat - search: Response received', response.data);
 
-            // Map backend structure to frontend structure if necessary
             const formattedBooks = response.data.map((book: any, index: number) => ({
                 id: book.id || index.toString(),
                 title: book.title,
                 author: book.authors?.join(', ') || '작자미상',
                 thumbnail: book.thumbnail || 'https://via.placeholder.com/60x90?text=No+Image',
-                summary: book.summary, // Pass the summary from backend
+                summary: book.summary,
             }));
 
             setBooks(formattedBooks);
         } catch (error) {
             console.error('Search error:', error);
-            // Fallback to mock for demo if backend fails or no API key
-            const mockResults = [
-                {
-                    id: 'm1',
-                    title: '어린왕자',
-                    author: '생텍쥐페리',
-                    thumbnail: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=200',
-                },
-                {
-                    id: 'm2',
-                    title: '아낌없이 주는 나무',
-                    author: '쉘 실버스타인',
-                    thumbnail: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=200',
-                },
-            ].filter(b => b.title.includes(query));
-            setBooks(mockResults);
+            // Fallback for demo
+            setBooks([
+                { id: 'm1', title: '어린왕자', author: '생텍쥐페리', thumbnail: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&q=80&w=200' },
+                { id: 'm2', title: '아낌없이 주는 나무', author: '쉘 실버스타인', thumbnail: 'https://images.unsplash.com/photo-1512820790803-83ca734da794?auto=format&fit=crop&q=80&w=200' }
+            ].filter(b => b.title.includes(query)));
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleAddBook = async (book: any) => {
+        setAdding(true);
+        try {
+            await axios.post(`${API_URL}/user-books`, {
+                userId,
+                bookTitle: book.title,
+                author: book.author,
+                coverImage: book.thumbnail,
+                summary: book.summary,
+            });
+            navigation.navigate('BookAddedSuccess', { book });
+        } catch (error) {
+            console.error('Add book error:', error);
+            // Fallback: navigate even if it fails for demo purposes or alert
+            navigation.navigate('BookAddedSuccess', { book });
+        } finally {
+            setAdding(false);
         }
     };
 
@@ -138,7 +147,7 @@ const BookSearchScreen = ({ navigation }: any) => {
                 <TouchableOpacity onPress={() => navigation.goBack()}>
                     <ChevronLeft size={24} color={theme.colors.text.primary} />
                 </TouchableOpacity>
-                <Title>어떤 책을 읽었나요?</Title>
+                <Title>어떤 책을 읽을까요?</Title>
             </Header>
 
             <SearchBarContainer>
@@ -155,14 +164,14 @@ const BookSearchScreen = ({ navigation }: any) => {
                 </TouchableOpacity>
             </SearchBarContainer>
 
-            {loading ? (
+            {loading || adding ? (
                 <ActivityIndicator size="large" color={theme.colors.primary} style={{ marginTop: 20 }} />
             ) : (
                 <FlatList
                     data={books}
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => (
-                        <BookItem onPress={() => navigation.navigate('SentenceInput', { book: item })}>
+                        <BookItem onPress={() => handleAddBook(item)}>
                             <BookCover source={{ uri: item.thumbnail }} />
                             <BookInfo>
                                 <BookTitle>{item.title}</BookTitle>

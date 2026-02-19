@@ -8,10 +8,11 @@ import { OcrModule } from './ocr/ocr.module';
 import { ChatModule } from './chat/chat.module';
 import { SeedsModule } from './seeds/seeds.module';
 import { DiariesModule } from './diaries/diaries.module';
+import { UserBooksModule } from './user-books/user-books.module';
 
 @Module({
-  imports: [AuthModule, PrismaModule, BooksModule, OcrModule, ChatModule, SeedsModule, DiariesModule],
+  imports: [AuthModule, PrismaModule, BooksModule, OcrModule, ChatModule, SeedsModule, DiariesModule, UserBooksModule],
   controllers: [AppController],
   providers: [AppService],
 })
-export class AppModule {}
+export class AppModule { }

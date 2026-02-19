@@ -21,6 +21,7 @@ model User {
   seeds        Seed[]
   chatRooms    ChatRoom[]
   diaries      Diary[]
+  userBooks    UserBook[]
 }
 
 model Family {
@@ -79,4 +80,19 @@ model Diary {
   summary    String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+}
+
+model UserBook {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+  bookTitle   String
+  author      String?
+  coverImage  String?
+  summary     String?
+  status      String   @default("READING") // READING, COMPLETED
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([userId, bookTitle])
 }
