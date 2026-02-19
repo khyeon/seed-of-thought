@@ -4,7 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
 export class ChatService {
-    private groq: Groq;
+    private groq: Groq | null;
     constructor(private prisma: PrismaService) {
         this.groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
     }
@@ -61,17 +61,19 @@ export class ChatService {
 
         const isEnd = history.length >= 6;
 
+        const messages: any[] = [
+            { role: 'system', content: this.getSystemPrompt(room.seed.sentence, plot, isEnd) },
+            ...history.map(m => ({
+                role: (m.sender === 'USER' ? 'user' : 'assistant') as 'user' | 'assistant',
+                content: m.content
+            })),
+            { role: 'user', content }
+        ];
+
         const completion = await this.groq.chat.completions.create({
             model: 'llama-3.1-8b-instant',
             temperature: 0.7,
-            messages: [
-                { role: 'system', content: this.getSystemPrompt(room.seed.sentence, plot, isEnd) },
-                ...history.map(m => ({
-                    role: m.sender === 'USER' ? 'user' : 'assistant' as const,
-                    content: m.content
-                })),
-                { role: 'user', content }
-            ],
+            messages: messages,
         });
 
         const aiText = completion.choices[0]?.message?.content || "";
