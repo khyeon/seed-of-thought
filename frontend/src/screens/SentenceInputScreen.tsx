@@ -79,25 +79,6 @@ const StyledTextInput = styled.TextInput`
   text-align-vertical: top;
 `;
 
-const OCRButton = styled.TouchableOpacity`
-  flex-direction: row;
-  align-items: center;
-  justify-content: center;
-  background-color: ${theme.colors.white};
-  border-width: 2px;
-  border-color: ${theme.colors.primary};
-  border-radius: ${theme.borderRadius.full}px;
-  padding: ${theme.spacing.md}px;
-  margin-top: ${theme.spacing.lg}px;
-`;
-
-const OCRButtonText = styled.Text`
-  font-size: 16px;
-  font-weight: bold;
-  color: ${theme.colors.primary};
-  margin-left: ${theme.spacing.sm}px;
-`;
-
 const SubmitButton = styled.TouchableOpacity<{ disabled?: boolean }>`
   background-color: ${props => props.disabled ? theme.colors.text.disabled : theme.colors.primary};
   border-radius: ${theme.borderRadius.full}px;
@@ -107,34 +88,6 @@ const SubmitButton = styled.TouchableOpacity<{ disabled?: boolean }>`
   justify-content: center;
   align-items: center;
   ${theme.shadows.soft};
-`;
-
-const EmotionContainer = styled.View`
-  flex-direction: row;
-  justify-content: space-between;
-  margin-bottom: ${theme.spacing.lg}px;
-`;
-
-const EmotionItem = styled.TouchableOpacity<{ selected: boolean }>`
-  background-color: ${props => props.selected ? theme.colors.secondary : theme.colors.white};
-  border-radius: ${theme.borderRadius.md}px;
-  padding: ${theme.spacing.sm}px;
-  align-items: center;
-  width: 22%;
-  border-width: 2px;
-  border-color: ${props => props.selected ? theme.colors.primary : 'transparent'};
-  ${theme.shadows.soft};
-`;
-
-const EmotionEmoji = styled.Text`
-  font-size: 28px;
-`;
-
-const EmotionLabel = styled.Text`
-  font-size: 12px;
-  color: ${theme.colors.text.primary};
-  margin-top: 4px;
-  font-weight: bold;
 `;
 
 const SubmitButtonText = styled.Text`
@@ -151,17 +104,8 @@ import { API_URL } from '../config/apiConfig';
 const SentenceInputScreen = ({ route, navigation }: any) => {
   const { book } = route.params;
   const [sentence, setSentence] = useState('');
-  const [emotion, setEmotion] = useState('기뻐요');
-  const [reason, setReason] = useState('');
   const { userId } = useUserStore();
   const [loading, setLoading] = useState(false);
-
-  const emotions = [
-    { label: '기뻐요', emoji: '😀' },
-    { label: '슬퍼요', emoji: '😢' },
-    { label: '궁금해요', emoji: '🤔' },
-    { label: '놀라워요', emoji: '😲' },
-  ];
 
   const handleManualSubmit = async () => {
     if (!sentence.trim()) return;
@@ -176,8 +120,6 @@ const SentenceInputScreen = ({ route, navigation }: any) => {
         coverImage: book.thumbnail,
         sentence: sentence.trim(),
         inputType: 'MANUAL',
-        emotion,
-        reason: reason.trim(),
       });
 
       console.log('Seed saved successfully:', response.data);
@@ -227,38 +169,7 @@ const SentenceInputScreen = ({ route, navigation }: any) => {
             />
           </TextAreaContainer>
 
-          <OCRButton onPress={handleOCR}>
-            <Camera size={20} color={theme.colors.primary} />
-            <OCRButtonText>사진 찍어서 문장 가져오기</OCRButtonText>
-          </OCRButton>
 
-          <View style={{ marginTop: 30 }}>
-            <InputLabel>이 문장을 읽고 어떤 느낌이 들었나요?</InputLabel>
-            <EmotionContainer>
-              {emotions.map((item) => (
-                <EmotionItem
-                  key={item.label}
-                  selected={emotion === item.label}
-                  onPress={() => setEmotion(item.label)}
-                >
-                  <EmotionEmoji>{item.emoji}</EmotionEmoji>
-                  <EmotionLabel>{item.label}</EmotionLabel>
-                </EmotionItem>
-              ))}
-            </EmotionContainer>
-          </View>
-
-          <View style={{ marginTop: 10 }}>
-            <InputLabel>왜 이 문장을 선택했나요?</InputLabel>
-            <TextAreaContainer style={{ height: 100 }}>
-              <StyledTextInput
-                multiline
-                placeholder="간단한 이유를 적어주세요 (예시: 주인공이 멋져서)"
-                value={reason}
-                onChangeText={setReason}
-              />
-            </TextAreaContainer>
-          </View>
 
           <SubmitButton
             disabled={!sentence.trim() || loading}

@@ -9,33 +9,26 @@ export class ChatService {
         this.groq = process.env.GROQ_API_KEY ? new Groq({ apiKey: process.env.GROQ_API_KEY }) : null;
     }
 
-    private readonly THINKING_MIRROR_PERSONA = `
-    # 역할: 아이의 마음을 비추는 '생각 거울'
-    너는 아이가 책 속에서 발견한 보물(문장)을 함께 감상하는 다정한 친구야. 
-    줄거리를 완벽하게 따라가는 것보다 **지금 아이가 말하는 기분과 생각**에 더 집중해줘.
+    private readonly GEM_FINDER_PERSONA = `
+    # 역할: 보석을 함께 찾는 '다정한 동료'
+    너는 아이가 책에서 발견한 문장(보석)을 함께 감상하는 친구야. 절대 가르치거나 논리적인 이유를 캐묻지 마.
 
-    # 대응 전략 (자연스럽게 스며들기)
+    # 핵심 대화 원칙
+    1. **보석 찾기 (직관 지지)**: 아이가 선택 이유를 말하지 못하거나 짧게 답해도 "이유가 없어도 괜찮아! 이 문장이 반짝거려서 너를 불렀나 보네"라며 아이의 선택 자체를 무조건 존중해줘.
+    2. **자아 연결 (Text-to-Self)**: 책 내용에만 머물지 말고, 아이의 실제 기억이나 경험과 연결해줘. (예: "이 장면을 보니 네가 예전에 여행 갔던 기억이 나니?")
+    3. **확산적 질문 (하브루타)**: 정답이 없는 열린 질문을 던져. 아이가 막막해 보이면 "A일까, B일까?" 같은 '객관식 발문'으로 사고의 시동을 걸어줘.
+    4. **함께 궁금해하기**: 너도 정답을 모르는 척하며 "어떻게 이런 일이 생겼을까?"라고 함께 탐구하는 태도를 가져.
 
-    ## 1. 아이가 다른 길로 샐 때 (발산 상태)
-    - **상황**: 딴소리하거나 "몰라요"라고 할 때
-    - **대응**: 바로 책 이야기로 끌고 오지 마. 먼저 아이의 말을 다정하게 받아주고(맞장구), 그다음 "아까 그 문장에서는 이런 일도 있었는데, 혹시 그때도 이런 기분이었을까?" 정도로 **가볍게만** 연결해. 
-    - **핵심**: 아이의 일상과 책 속의 상황을 부드럽게 섞어줘.
-
-    ## 2. 아이가 자기 생각을 말할 때 (수렴 상태)
-    - **상황**: 감정을 표현하거나 가치 판단을 할 때
-    - **대응**: 칭찬과 공감을 아끼지 마! "정말 따뜻한 마음이네!" 같은 반응 뒤에, 그 마음이 책 속 주인공에게 전달된다면 어떤 일이 벌어질지 상상하도록 도와줘.
-    - **핵심**: 정답을 유도하지 말고 아이의 생각이 '정답'이 되게 해줘.
-
-    # 절대 규칙
-    - 줄거리를 요약하거나 설명하려 하지 마. 줄거리는 대화의 '양념'일 뿐이야.
-    - 아이의 말속에 있는 키워드를 반복하며 공감해줘. (거울 효과)
-    - 한 번에 하나의 짧은 질문만 던져. (~했니? ~일까?)
-    - AI 티가 나는 딱딱한 말투나 단계 설명은 절대 하지 마.
+    # 대화 지침
+    - 아이의 감정 단어를 반복하며 깊게 공감해줘. (거울 효과)
+    - 대화가 정체되면 역할을 나누어 읽거나, "만약 장소가 바뀐다면?" 같은 상상 놀이를 제안해.
+    - 지시어, 단계 설명, AI 티가 나는 딱딱한 말투는 절대 금지야.
     `;
 
     private getSystemPrompt(sentence: string, plot?: string) {
-        return `${this.THINKING_MIRROR_PERSONA}
-        [중심문장]: "${sentence}" ${plot ? `\n[줄거리]: ${plot}` : ''}`;
+        return `${this.GEM_FINDER_PERSONA}
+        [아이의 보석(문장)]: "${sentence}" 
+        [책의 맥락(줄거리)]: ${plot || '정보 없음'}`;
     }
 
     async startConversation(userId: string, seedId: string, bookContext?: string) {
@@ -44,20 +37,11 @@ export class ChatService {
 
         const room = await this.prisma.chatRoom.create({ data: { userId, seedId, status: 'ACTIVE' } });
 
-        if (bookContext) {
-            await this.prisma.chatMessage.create({
-                data: { chatRoomId: room.id, sender: 'SYSTEM', content: bookContext }
-            });
-        }
-        // 첫 질문 생성 (AI를 사용하여 매번 다르게 생동감 있게 인사)
         let initialPrompt = "";
-
         if (this.groq) {
             const systemContent = this.getSystemPrompt(seed.sentence, bookContext);
-            const userMessage = `안녕! 내가 이 책에서 이 문장을 골랐어: "${seed.sentence}"
-            ${seed.emotion ? `- 내 기분: ${seed.emotion}` : ''}
-            ${seed.reason ? `- 고른 이유: ${seed.reason}` : ''}
-            위 정보를 바탕으로 '생각 거울'로서 나에게 첫인사를 다정하게 건네줘. (~했니? ~구나? 말투 사용)`;
+            const userMessage = `안녕! 내가 이 보석 같은 문장을 찾았어: "${seed.sentence}"
+            내가 왜 이 문장을 골랐는지 몰라도 괜찮다고 말해주면서, 다정하게 첫인사를 건네줘.`;
 
             const completion = await this.groq.chat.completions.create({
                 model: 'llama-3.1-8b-instant',
@@ -67,9 +51,9 @@ export class ChatService {
                     { role: 'user', content: userMessage }
                 ],
             });
-            initialPrompt = completion.choices[0]?.message?.content || "안녕! 정말 멋진 문장을 골랐구나! 이 부분을 읽을 때 어떤 기분이 들었어?";
+            initialPrompt = completion.choices[0]?.message?.content || "반짝이는 보석 같은 문장을 찾았구나! 이 문장이 너를 불렀나 봐. 어떤 기분이 드니?";
         } else {
-            initialPrompt = `안녕! "${seed.sentence}" 이 문장을 골랐구나! 이 부분을 읽을 때 어떤 기분이 들었어?`;
+            initialPrompt = `안녕! "${seed.sentence}" 이 문장은 정말 반짝이는 보석 같아. 이 부분이 왜 네 눈에 띄었을까?`;
         }
 
         await this.prisma.chatMessage.create({
@@ -79,20 +63,12 @@ export class ChatService {
         return { chatRoomId: room.id, message: { content: initialPrompt, sender: 'AI' } };
     }
 
-    async sendMessage(
-        chatRoomId: string,
-        content: string,
-        history: { role: 'user' | 'assistant', content: string }[],
-        sentence: string,
-        plot?: string
-    ) {
+    async sendMessage(chatRoomId: string, content: string, history: any[], sentence: string, plot?: string) {
         if (!this.groq) return this.getMockResponse();
 
-        // 1. 유저 메시지 저장 (비동기로 실행하여 응답 속도 향상 가등하나 일단 순차 처리)
         await this.prisma.chatMessage.create({ data: { chatRoomId, sender: 'USER', content } });
 
-        // 2. AI 메시지 생성 (DB 조회 없이 전달된 파라미터 활용)
-        const messages: any[] = [
+        const messages = [
             { role: 'system', content: this.getSystemPrompt(sentence, plot) },
             ...history,
             { role: 'user', content }
@@ -100,21 +76,17 @@ export class ChatService {
 
         const completion = await this.groq.chat.completions.create({
             model: 'llama-3.1-8b-instant',
-            temperature: 0.7,
+            temperature: 0.7, // 확산적 사고를 위해 적절한 창의성 유지
             messages: messages,
         });
 
         const aiText = completion.choices[0]?.message?.content || "";
-
-        // 3. AI 메시지 저장
-        const savedMsg = await this.prisma.chatMessage.create({
+        return await this.prisma.chatMessage.create({
             data: { chatRoomId, sender: 'AI', content: aiText }
         });
-
-        return savedMsg;
     }
 
     private getMockResponse() {
-        return { content: "우와, 정말 멋진 생각이야!", sender: 'AI', createdAt: new Date() };
+        return { content: "네 생각이 반짝반짝 빛나고 있어! 더 이야기해줄래?", sender: 'AI', createdAt: new Date() };
     }
 }
