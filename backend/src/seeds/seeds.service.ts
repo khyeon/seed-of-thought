@@ -12,6 +12,8 @@ export class SeedsService {
         coverImage?: string;
         sentence: string;
         inputType: 'MANUAL' | 'OCR';
+        emotion?: string;
+        reason?: string;
     }) {
         return this.prisma.seed.create({
             data: {
@@ -21,6 +23,8 @@ export class SeedsService {
                 coverImage: data.coverImage,
                 sentence: data.sentence,
                 inputType: data.inputType,
+                emotion: data.emotion,
+                reason: data.reason,
             },
         });
     }

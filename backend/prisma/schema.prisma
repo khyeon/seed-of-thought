@@ -39,6 +39,8 @@ model Seed {
   coverImage  String?
   sentence    String
   inputType   String   @default("MANUAL")
+  emotion     String?
+  reason      String?
   createdAt   DateTime @default(now())
   chatRoom    ChatRoom?
 }

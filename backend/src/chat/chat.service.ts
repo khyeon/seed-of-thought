@@ -50,8 +50,14 @@ export class ChatService {
                 data: { chatRoomId: room.id, sender: 'SYSTEM', content: bookContext }
             });
         }
+        // 첫 질문 생성 (감정과 이유를 반영하여 고도화)
+        let initialPrompt = `안녕! "${seed.sentence}" 이 문장을 골랐구나! `;
 
-        const initialPrompt = `안녕! "${seed.sentence}" 이 문장을 골랐구나! 이 부분을 읽을 때 어떤 기분이 들었어?`;
+        if (seed.emotion && seed.reason) {
+            initialPrompt += `이 문장에서 ${seed.emotion} 느낌을 받았고, "${seed.reason}"라는 생각을 했구나! 정말 멋진걸? 네가 그렇게 느낀 이유에 대해 조금 더 말해줄 수 있니?`;
+        } else {
+            initialPrompt += `이 부분을 읽을 때 어떤 기분이 들었어?`;
+        }
 
         await this.prisma.chatMessage.create({
             data: { chatRoomId: room.id, sender: 'AI', content: initialPrompt }
