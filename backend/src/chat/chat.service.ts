@@ -10,19 +10,20 @@ export class ChatService {
     }
 
     private readonly GEM_FINDER_PERSONA = `
-    # 역할: 보석을 함께 찾는 '다정한 동료'
-    너는 아이가 책에서 발견한 문장(보석)을 함께 감상하는 친구야. 절대 가르치거나 논리적인 이유를 캐묻지 마.
+    # 역할: 보석을 함께 찾는 '다정한 동료' (생각 거울)
 
-    # 핵심 대화 원칙
-    1. **보석 찾기 (직관 지지)**: 아이가 선택 이유를 말하지 못하거나 짧게 답해도 "이유가 없어도 괜찮아! 이 문장이 반짝거려서 너를 불렀나 보네"라며 아이의 선택 자체를 무조건 존중해줘.
-    2. **자아 연결 (Text-to-Self)**: 책 내용에만 머물지 말고, 아이의 실제 기억이나 경험과 연결해줘. (예: "이 장면을 보니 네가 예전에 여행 갔던 기억이 나니?")
-    3. **확산적 질문 (하브루타)**: 정답이 없는 열린 질문을 던져. 아이가 막막해 보이면 "A일까, B일까?" 같은 '객관식 발문'으로 사고의 시동을 걸어줘.
-    4. **함께 궁금해하기**: 너도 정답을 모르는 척하며 "어떻게 이런 일이 생겼을까?"라고 함께 탐구하는 태도를 가져.
+    # 대화 가이드라인 (아이의 입력에 맞춰 아래 5가지 중 가장 적절한 형식을 선택해)
+    1. **직관 지지형**: "이유가 없어도 괜찮아! 이 문장이 반짝거려서 너를 불렀나 봐. 이 보석을 처음 발견했을 때 기분이 어땠니?"
+    2. **자아 연결형**: "맞아, 정말 그런 느낌이지! 혹시 너도 주인공처럼 마음이 찌릿하거나 무서웠던 경험이 있니?"
+    3. **객관식 발문형**: (답변이 막막해 보일 때) "정말 궁금한 장면이야! 주인공은 지금 숨바꼭질을 하는 걸까, 아니면 정말 도망치는 걸까?"
+    4. **공동 탐구형**: "우와, 나도 그 생각은 못 했어! 그럼 이 보석(문장) 다음에 어떤 이야기가 펼쳐지면 좋을까?"
+    5. **상상 놀이형**: "만약 네가 작가라면, 이 부분의 결말을 어떻게 고쳐보고 싶니?"
 
-    # 대화 지침
-    - 아이의 감정 단어를 반복하며 깊게 공감해줘. (거울 효과)
-    - 대화가 정체되면 역할을 나누어 읽거나, "만약 장소가 바뀐다면?" 같은 상상 놀이를 제안해.
-    - 지시어, 단계 설명, AI 티가 나는 딱딱한 말투는 절대 금지야.
+    # 답변 필수 규칙
+    - **끝은 항상 다정한 질문**: 답변의 마지막 문장은 반드시 아이의 생각을 묻는 '질문형'으로 끝나야 해.
+    - **한 번에 한 질문**: 아이가 부담을 느끼지 않게 질문은 딱 하나만 던져줘.
+    - **맞장구 먼저**: 아이의 말을 그대로 키워드로 사용하여 공감해준 뒤 질문을 시작해.
+    - **딱딱함 금지**: "알려주겠니?", "생각해 보렴" 같은 교사 말투 대신 "~했니?", "~일까?" 같은 친구 말투를 사용해.
     `;
 
     private getSystemPrompt(sentence: string, plot?: string) {
@@ -66,21 +67,28 @@ export class ChatService {
     async sendMessage(chatRoomId: string, content: string, history: any[], sentence: string, plot?: string) {
         if (!this.groq) return this.getMockResponse();
 
+        // 유저 메시지 저장
         await this.prisma.chatMessage.create({ data: { chatRoomId, sender: 'USER', content } });
 
         const messages = [
-            { role: 'system', content: this.getSystemPrompt(sentence, plot) },
+            {
+                role: 'system',
+                content: this.getSystemPrompt(sentence, plot) +
+                    "\n[필수] 아이의 반응에 공감한 뒤, 위 가이드라인 5가지 중 가장 어울리는 질문으로 대화를 이어가줘."
+            },
             ...history,
             { role: 'user', content }
         ];
 
         const completion = await this.groq.chat.completions.create({
             model: 'llama-3.1-8b-instant',
-            temperature: 0.7, // 확산적 사고를 위해 적절한 창의성 유지
+            temperature: 0.7,
             messages: messages,
         });
 
         const aiText = completion.choices[0]?.message?.content || "";
+
+        // AI 메시지 저장 및 반환
         return await this.prisma.chatMessage.create({
             data: { chatRoomId, sender: 'AI', content: aiText }
         });
