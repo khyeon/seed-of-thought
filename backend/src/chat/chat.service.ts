@@ -49,13 +49,27 @@ export class ChatService {
                 data: { chatRoomId: room.id, sender: 'SYSTEM', content: bookContext }
             });
         }
-        // 첫 질문 생성 (감정과 이유를 반영하여 고도화)
-        let initialPrompt = `안녕! "${seed.sentence}" 이 문장을 골랐구나! `;
+        // 첫 질문 생성 (AI를 사용하여 매번 다르게 생동감 있게 인사)
+        let initialPrompt = "";
 
-        if (seed.emotion && seed.reason) {
-            initialPrompt += `이 문장에서 ${seed.emotion} 느낌을 받았고, "${seed.reason}"라는 생각을 했구나! 정말 멋진걸? 네가 그렇게 느낀 이유에 대해 조금 더 말해줄 수 있니?`;
+        if (this.groq) {
+            const systemContent = this.getSystemPrompt(seed.sentence, bookContext);
+            const userMessage = `안녕! 내가 이 책에서 이 문장을 골랐어: "${seed.sentence}"
+            ${seed.emotion ? `- 내 기분: ${seed.emotion}` : ''}
+            ${seed.reason ? `- 고른 이유: ${seed.reason}` : ''}
+            위 정보를 바탕으로 '생각 거울'로서 나에게 첫인사를 다정하게 건네줘. (~했니? ~구나? 말투 사용)`;
+
+            const completion = await this.groq.chat.completions.create({
+                model: 'llama-3.1-8b-instant',
+                temperature: 0.8,
+                messages: [
+                    { role: 'system', content: systemContent },
+                    { role: 'user', content: userMessage }
+                ],
+            });
+            initialPrompt = completion.choices[0]?.message?.content || "안녕! 정말 멋진 문장을 골랐구나! 이 부분을 읽을 때 어떤 기분이 들었어?";
         } else {
-            initialPrompt += `이 부분을 읽을 때 어떤 기분이 들었어?`;
+            initialPrompt = `안녕! "${seed.sentence}" 이 문장을 골랐구나! 이 부분을 읽을 때 어떤 기분이 들었어?`;
         }
 
         await this.prisma.chatMessage.create({
