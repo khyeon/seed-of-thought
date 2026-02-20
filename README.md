@@ -3,6 +3,7 @@
 AI-powered diary service for children.
 
 Check the [Master Documentation](file:///Users/kyouhwayeon/Documents/Seed%20of%20Thought/docs/MASTER_DOCUMENTATION.md) for v1.0 specifications.
+Refer to the [Development Strategy Guide](file:///Users/kyouhwayeon/Documents/Seed%20of%20Thought/docs/DEVELOPMENT_STRATEGY.md) for contribution and deployment workflows.
 
 ## 🚀 Getting Started
 
