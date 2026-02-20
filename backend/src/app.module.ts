@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { ConfigModule } from '@nestjs/config';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
 import { BooksModule } from './books/books.module';
@@ -11,7 +12,20 @@ import { DiariesModule } from './diaries/diaries.module';
 import { UserBooksModule } from './user-books/user-books.module';
 
 @Module({
-  imports: [AuthModule, PrismaModule, BooksModule, OcrModule, ChatModule, SeedsModule, DiariesModule, UserBooksModule],
+  imports: [
+    ConfigModule.forRoot({
+      envFilePath: `.env.${process.env.NODE_ENV || 'development'}`,
+      isGlobal: true,
+    }),
+    AuthModule,
+    PrismaModule,
+    BooksModule,
+    OcrModule,
+    ChatModule,
+    SeedsModule,
+    DiariesModule,
+    UserBooksModule
+  ],
   controllers: [AppController],
   providers: [AppService],
 })

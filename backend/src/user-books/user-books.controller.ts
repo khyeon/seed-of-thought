@@ -15,6 +15,11 @@ export class UserBooksController {
         return this.userBooksService.getCounts(userId);
     }
 
+    @Get('stats')
+    async getMonthlyStats(@Query('userId') userId: string) {
+        return this.userBooksService.getMonthlyStats(userId);
+    }
+
     @Get()
     async findAll(@Query('userId') userId: string, @Query('status') status: string) {
         return this.userBooksService.getBooksByStatus(userId, status);

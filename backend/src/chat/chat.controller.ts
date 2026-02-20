@@ -6,8 +6,8 @@ export class ChatController {
     constructor(private readonly chatService: ChatService) { }
 
     @Post('start')
-    async startChat(@Body() body: { userId: string; seedId: string }) {
-        return this.chatService.startConversation(body.userId, body.seedId);
+    async startChat(@Body() body: { userId: string; seedId: string; bookContext?: string }) {
+        return this.chatService.startConversation(body.userId, body.seedId, body.bookContext);
     }
 
     @Post(':id/message')

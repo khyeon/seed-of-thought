@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image } from 'react-native';
+import { View, Text, FlatList, TouchableOpacity, ActivityIndicator, Image, Alert, Platform } from 'react-native';
 import styled from 'styled-components/native';
 import { theme } from '../styles/theme';
 import { ChevronLeft } from 'lucide-react-native';
@@ -25,7 +25,7 @@ const Title = styled.Text`
   margin-left: ${theme.spacing.md}px;
 `;
 
-const BookCard = styled.TouchableOpacity`
+const BookCard = styled.View`
   background-color: ${theme.colors.white};
   margin-horizontal: ${theme.spacing.lg}px;
   margin-bottom: ${theme.spacing.md}px;
@@ -47,6 +47,12 @@ const BookInfo = styled.View`
   margin-left: ${theme.spacing.md}px;
 `;
 
+const LinkArea = styled.TouchableOpacity`
+  flex: 1;
+  flex-direction: row;
+  align-items: center;
+`;
+
 const BookTitle = styled.Text`
   font-size: 16px;
   font-weight: bold;
@@ -57,6 +63,40 @@ const BookAuthor = styled.Text`
   font-size: 14px;
   color: ${theme.colors.text.secondary};
   margin-top: 4px;
+`;
+
+const ActionButton = styled.TouchableOpacity`
+  background-color: ${theme.colors.primary};
+  padding: 8px 12px;
+  border-radius: 15px;
+  align-items: center;
+  min-width: 80px;
+`;
+
+const ActionText = styled.Text`
+  color: ${theme.colors.white};
+  font-size: 12px;
+  font-weight: bold;
+`;
+
+const ButtonContainer = styled.View`
+  flex-direction: column;
+  gap: 8px;
+  margin-left: 10px;
+`;
+
+const SecondaryButton = styled.TouchableOpacity`
+  background-color: ${theme.colors.accent};
+  padding: 8px 12px;
+  border-radius: 15px;
+  align-items: center;
+  min-width: 80px;
+`;
+
+const SecondaryText = styled.Text`
+  color: ${theme.colors.text.primary};
+  font-size: 12px;
+  font-weight: bold;
 `;
 
 const ReadingListScreen = ({ navigation }: any) => {
@@ -79,6 +119,34 @@ const ReadingListScreen = ({ navigation }: any) => {
         }
     };
 
+    const handleUpdateStatus = async (id: string) => {
+        console.log('Update status clicked for book:', id);
+        const update = async () => {
+            try {
+                await axios.patch(`${API_URL}/user-books/${id}/status`, { status: 'COMPLETED' });
+                fetchBooks();
+            } catch (error) {
+                console.error('Error updating status:', error);
+                Alert.alert('오류', '상태를 업데이트하지 못했습니다.');
+            }
+        };
+
+        if (Platform.OS === 'web') {
+            if ((window as any).confirm('이 책을 다 읽으셨나요? 다 읽은 책 목록으로 이동합니다.')) {
+                update();
+            }
+        } else {
+            Alert.alert(
+                '읽기 완료',
+                '이 책을 다 읽으셨나요? 다 읽은 책 목록으로 이동합니다.',
+                [
+                    { text: '취소', style: 'cancel' },
+                    { text: '완료', onPress: update }
+                ]
+            );
+        }
+    };
+
     return (
         <Container>
             <Header>
@@ -95,19 +163,29 @@ const ReadingListScreen = ({ navigation }: any) => {
                     data={books}
                     keyExtractor={(item) => item.id}
                     renderItem={({ item }) => (
-                        <BookCard onPress={() => navigation.navigate('SentenceInput', {
-                            book: {
-                                title: item.bookTitle,
-                                authors: [item.author],
-                                thumbnail: item.coverImage,
-                                summary: item.summary
-                            }
-                        })}>
-                            <BookCover source={{ uri: item.coverImage || 'https://via.placeholder.com/50x75' }} />
-                            <BookInfo>
-                                <BookTitle>{item.bookTitle}</BookTitle>
-                                <BookAuthor>{item.author}</BookAuthor>
-                            </BookInfo>
+                        <BookCard>
+                            <LinkArea onPress={() => navigation.navigate('SentenceInput', {
+                                book: {
+                                    title: item.bookTitle,
+                                    authors: [item.author],
+                                    thumbnail: item.coverImage,
+                                    summary: item.summary
+                                }
+                            })}>
+                                <BookCover source={{ uri: item.coverImage || 'https://via.placeholder.com/50x75' }} />
+                                <BookInfo>
+                                    <BookTitle numberOfLines={1}>{item.bookTitle}</BookTitle>
+                                    <BookAuthor>{item.author}</BookAuthor>
+                                </BookInfo>
+                            </LinkArea>
+                            <ButtonContainer>
+                                <ActionButton onPress={() => handleUpdateStatus(item.id)}>
+                                    <ActionText>읽기 완료</ActionText>
+                                </ActionButton>
+                                <SecondaryButton onPress={() => navigation.navigate('Archive', { bookTitle: item.bookTitle })}>
+                                    <SecondaryText>열매 보기</SecondaryText>
+                                </SecondaryButton>
+                            </ButtonContainer>
                         </BookCard>
                     )}
                     ListEmptyComponent={

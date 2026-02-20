@@ -7,6 +7,7 @@ import {
     Image,
     TouchableOpacity,
     ActivityIndicator,
+    Alert,
 } from 'react-native';
 import styled from 'styled-components/native';
 import { theme } from '../styles/theme';
@@ -97,8 +98,9 @@ const BookSearchScreen = ({ navigation }: any) => {
         if (!query.trim()) return;
         setLoading(true);
         try {
-            const searchUrl = `${API_URL}/books/search?query=${query}`;
-            const response = await axios.get(searchUrl);
+            const response = await axios.get(`${API_URL}/books/search`, {
+                params: { query }
+            });
 
             const formattedBooks = response.data.map((book: any, index: number) => ({
                 id: book.id || index.toString(),
@@ -122,20 +124,34 @@ const BookSearchScreen = ({ navigation }: any) => {
     };
 
     const handleAddBook = async (book: any) => {
+        if (!userId) {
+            Alert.alert('알림', '로그인이 필요합니다.');
+            return;
+        }
+
         setAdding(true);
+        console.log('--- Sending Add Book Request ---');
+        console.log('Payload:', {
+            userId,
+            bookTitle: book.title,
+            author: book.author,
+            coverImage: book.thumbnail,
+            summary: book.summary,
+        });
+
         try {
-            await axios.post(`${API_URL}/user-books`, {
+            const response = await axios.post(`${API_URL}/user-books`, {
                 userId,
                 bookTitle: book.title,
                 author: book.author,
                 coverImage: book.thumbnail,
                 summary: book.summary,
             });
+            console.log('Add book success:', response.data);
             navigation.navigate('BookAddedSuccess', { book });
-        } catch (error) {
-            console.error('Add book error:', error);
-            // Fallback: navigate even if it fails for demo purposes or alert
-            navigation.navigate('BookAddedSuccess', { book });
+        } catch (error: any) {
+            console.error('Add book error:', error.response?.data || error.message);
+            Alert.alert('오류', '책을 담는 중 문제가 발생했습니다. (백엔드 로그를 확인하세요)');
         } finally {
             setAdding(false);
         }

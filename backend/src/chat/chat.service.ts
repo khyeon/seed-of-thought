@@ -41,19 +41,24 @@ export class ChatService {
 
         let initialPrompt = "";
         if (this.groq) {
-            const systemContent = this.getSystemPrompt(seed.sentence, bookContext);
-            const userMessage = `내가 고른 보석(문장)은 이거야: "${seed.sentence}". 
-            이 문장에 대해 '생각 동료'로서 첫인사를 다정하게 건네줘. (~했니? ~구나? 말투 사용)`;
+            try {
+                const systemContent = this.getSystemPrompt(seed.sentence, bookContext);
+                const userMessage = `내가 고른 보석(문장)은 이거야: "${seed.sentence}". 
+                이 문장에 대해 '생각 동료'로서 첫인사를 다정하게 건네줘. (~했니? ~구나? 말투 사용)`;
 
-            const completion = await this.groq.chat.completions.create({
-                model: 'llama-3.1-8b-instant',
-                temperature: 0.85,
-                messages: [
-                    { role: 'system', content: systemContent },
-                    { role: 'user', content: userMessage }
-                ],
-            });
-            initialPrompt = completion.choices[0]?.message?.content || "안녕! 정말 반짝이는 문장을 골랐구나! 이 부분을 읽을 때 어떤 기분이 들었어?";
+                const completion = await this.groq.chat.completions.create({
+                    model: 'llama-3.1-8b-instant',
+                    temperature: 0.85,
+                    messages: [
+                        { role: 'system', content: systemContent },
+                        { role: 'user', content: userMessage }
+                    ],
+                });
+                initialPrompt = completion.choices[0]?.message?.content || "안녕! 정말 반짝이는 문장을 골랐구나! 이 부분을 읽을 때 어떤 기분이 들었어?";
+            } catch (error) {
+                console.error('Groq startConversation Error:', error);
+                initialPrompt = `안녕! "${seed.sentence}" 이 문장을 골랐구나! 이 부분을 읽을 때 어떤 기분이 들었어?`;
+            }
         } else {
             initialPrompt = `안녕! "${seed.sentence}" 이 문장을 골랐구나! 이 부분을 읽을 때 어떤 기분이 들었어?`;
         }
@@ -88,13 +93,18 @@ export class ChatService {
             { role: 'user', content }
         ];
 
-        const completion = await this.groq.chat.completions.create({
-            model: 'llama-3.1-8b-instant',
-            temperature: 0.85, // 창의성과 다양성을 위해 온도를 약간 높임
-            messages: messages,
-        });
-
-        const aiText = completion.choices[0]?.message?.content || "";
+        let aiText = "";
+        try {
+            const completion = await this.groq.chat.completions.create({
+                model: 'llama-3.1-8b-instant',
+                temperature: 0.85, // 창의성과 다양성을 위해 온도를 약간 높임
+                messages: messages,
+            });
+            aiText = completion.choices[0]?.message?.content || "";
+        } catch (error) {
+            console.error('Groq sendMessage Error:', error);
+            aiText = "네 생각이 반짝반짝 빛나고 있어! 더 이야기해줄래?";
+        }
 
         // 3. AI 메시지 저장
         const savedMsg = await this.prisma.chatMessage.create({

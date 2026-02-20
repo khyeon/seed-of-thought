@@ -7,44 +7,49 @@ export class BooksService {
 
     async search(query: string) {
         const kakaoClientId = process.env.KAKAO_CLIENT_ID;
-        console.log('BooksService.search called with query:', query);
-        console.log('KAKAO_CLIENT_ID length:', kakaoClientId?.length || 0);
+        console.log('--- Book Search Attempt ---');
+        console.log('Query:', query);
+        console.log('KAKAO_CLIENT_ID (first 5 chars):', kakaoClientId?.substring(0, 5) || 'MISSING');
 
         if (!kakaoClientId || kakaoClientId === 'your_kakao_client_id') {
-            console.log('Using mock books...');
+            console.log('Using mock books due to missing/default client ID');
             return this.getMockBooks(query);
         }
 
         try {
+            console.log('Calling Kakao API...');
             const response = await axios.get(this.KAKAO_API_URL, {
-                params: {
-                    query,
-                },
+                params: { query },
                 headers: {
                     Authorization: `KakaoAK ${kakaoClientId}`,
                 },
             });
 
             const documents = (response.data as any).documents;
-            console.log(`BooksService.search: Found ${documents?.length || 0} books`);
+            console.log(`Kakao API Success: Found ${documents?.length || 0} books`);
 
             if (!documents || documents.length === 0) {
-                console.log('No documents found from Kakao. Falling back to mock if query matches.');
-                const mocks = this.getMockBooks(query);
-                if (mocks.length > 0) return mocks;
+                console.log('No documents found from Kakao.');
+                return [];
             }
 
-            return (documents || []).map((book: any) => ({
+            return documents.map((book: any) => ({
                 title: book.title,
                 authors: book.authors,
                 publisher: book.publisher,
                 thumbnail: book.thumbnail,
                 isbn: book.isbn,
-                summary: book.contents, // Kakao API provides plot summary in 'contents'
+                summary: book.contents,
             }));
         } catch (error: any) {
-            console.error('BooksService.search: Kakao API Error:', error.response?.data || error.message);
-            // Fallback to mock on error
+            console.error('Kakao API Error Details:');
+            if (error.response) {
+                console.error('Status:', error.response.status);
+                console.error('Data:', JSON.stringify(error.response.data));
+            } else {
+                console.error('Message:', error.message);
+            }
+            // Fallback for demo
             return this.getMockBooks(query);
         }
     }
