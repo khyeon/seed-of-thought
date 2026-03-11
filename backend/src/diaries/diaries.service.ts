@@ -1,12 +1,16 @@
 import { Injectable, HttpException, HttpStatus } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import Groq from 'groq-sdk';
+import { ChatService } from '../chat/chat.service';
 
 @Injectable()
 export class DiariesService {
     private groq: Groq;
 
-    constructor(private prisma: PrismaService) {
+    constructor(
+        private prisma: PrismaService,
+        private chatService: ChatService
+    ) {
         if (process.env.GROQ_API_KEY) {
             this.groq = new Groq({
                 apiKey: process.env.GROQ_API_KEY,
@@ -120,7 +124,7 @@ export class DiariesService {
             });
         }
 
-        return this.prisma.diary.create({
+        const diary = await this.prisma.diary.create({
             data: {
                 userId: data.userId,
                 chatRoomId: data.chatRoomId,
@@ -131,6 +135,13 @@ export class DiariesService {
                 imageUrl: data.imageUrl,
             } as any,
         });
+
+        // 4. 대화 사후 분석 (비동기로 실행하여 응답 속도 유지)
+        this.chatService.analyzeAndSettleXP(data.chatRoomId).catch(err => {
+            console.error('Error in post-analysis after diary save:', err);
+        });
+
+        return diary;
     }
 
     async getDiariesByUser(userId: string, bookTitle?: string) {
