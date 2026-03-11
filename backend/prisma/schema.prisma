@@ -8,71 +8,73 @@ datasource db {
 }
 
 model User {
-  id           String   @id @default(uuid())
-  username     String   @unique
+  id           String        @id @default(uuid())
+  username     String        @unique
   password     String
-  email        String?  @unique
+  email        String?       @unique
   name         String?
-  role         String   @default("CHILD") // CHILD, PARENT
+  role         String        @default("CHILD")
   familyId     String?
-  family       Family?  @relation(fields: [familyId], references: [id])
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
-  seeds        Seed[]
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
   chatRooms    ChatRoom[]
   diaries      Diary[]
+  readingStats ReadingStat[]
+  seeds        Seed[]
+  treeState    TreeState?
+  family       Family?       @relation(fields: [familyId], references: [id])
   userBooks    UserBook[]
+  userStat     UserStat?
+  statLogs     UserStatLog[]
 }
 
 model Family {
   id        String   @id @default(uuid())
   name      String
-  members   User[]
   createdAt DateTime @default(now())
+  members   User[]
 }
 
 model Seed {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  bookTitle   String
-  author      String?
-  coverImage  String?
-  sentence    String
-  inputType   String   @default("MANUAL")
-  emotion     String?
-  reason      String?
-  createdAt   DateTime @default(now())
-  chatRoom    ChatRoom?
+  id         String    @id @default(uuid())
+  userId     String
+  bookTitle  String
+  author     String?
+  coverImage String?
+  sentence   String
+  inputType  String    @default("MANUAL")
+  emotion    String?
+  reason     String?
+  createdAt  DateTime  @default(now())
+  chatRoom   ChatRoom?
+  user       User      @relation(fields: [userId], references: [id])
 }
 
 model ChatRoom {
-  id        String   @id @default(uuid())
+  id        String        @id @default(uuid())
   userId    String
-  user      User     @relation(fields: [userId], references: [id])
-  seedId    String   @unique
-  seed      Seed     @relation(fields: [seedId], references: [id])
-  status    String   @default("ACTIVE")
-  createdAt DateTime @default(now())
+  seedId    String        @unique
+  status    String        @default("ACTIVE")
+  createdAt DateTime      @default(now())
   messages  ChatMessage[]
+  seed      Seed          @relation(fields: [seedId], references: [id])
+  user      User          @relation(fields: [userId], references: [id])
   diary     Diary?
 }
 
 model ChatMessage {
   id         String   @id @default(uuid())
   chatRoomId String
-  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id])
   sender     String
   content    String
   createdAt  DateTime @default(now())
+  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id])
 }
 
 model Diary {
   id         String   @id @default(uuid())
   userId     String
-  user       User     @relation(fields: [userId], references: [id])
   chatRoomId String   @unique
-  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id])
   content    String
   emotion    String?
   imageUrl   String?
@@ -80,19 +82,74 @@ model Diary {
   summary    String?
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id])
+  user       User     @relation(fields: [userId], references: [id])
 }
 
 model UserBook {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id])
-  bookTitle   String
-  author      String?
-  coverImage  String?
-  summary     String?
-  status      String   @default("READING") // READING, COMPLETED
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id         String   @id @default(uuid())
+  userId     String
+  bookTitle  String
+  author     String?
+  coverImage String?
+  summary    String?
+  status     String   @default("READING")
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+  user       User     @relation(fields: [userId], references: [id])
 
   @@unique([userId, bookTitle])
+}
+
+model ReadingStat {
+  id           String   @id @default(uuid())
+  userId       String
+  date         DateTime
+  totalSeconds Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
+
+  @@unique([userId, date])
+}
+
+model UserStat {
+  id                String   @id @default(uuid())
+  userId            String   @unique
+  selfEfficacyXP    Int      @default(0)
+  emotionalIQXP     Int      @default(0)
+  logicalFrameXP    Int      @default(0)
+  socialValueXP     Int      @default(0)
+  creativeInsightXP Int      @default(0)
+  totalLevel        Int      @default(1)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  user              User     @relation(fields: [userId], references: [id])
+}
+
+model UserStatLog {
+  id         String   @id @default(uuid())
+  userId     String
+  category   String // selfEfficacyXP, emotionalIQXP, logicalFrameXP, socialValueXP, creativeInsightXP
+  increment  Int
+  evidence   String // AI가 판단한 근거 문장 (아이의 실제 답변 중 핵심 문구)
+  reason     String // AI의 코멘트 (왜 이 점수를 줬는지)
+  bookTitle  String
+  createdAt  DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+// 나무 시각화 기능은 추상적이라는 피드백에 따라 제거 예정 (데이터 보존을 위해 일단 유지하되 사용 중단 가능)
+model TreeState {
+  id           String   @id @default(uuid())
+  userId       String   @unique
+  phase        String   @default("SEED")
+  trunkWidth   Float    @default(1.0)
+  leafDensity  Float    @default(0.1)
+  branchLength Float    @default(0.5)
+  soilHealth   Float    @default(1.0)
+  flowerCount  Int      @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id])
 }

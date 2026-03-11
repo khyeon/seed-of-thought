@@ -14,6 +14,7 @@ import { ChevronLeft, Share2, Download } from 'lucide-react-native';
 import axios from 'axios';
 import { useUserStore } from '../store/userStore';
 import { API_URL } from '../config/apiConfig';
+import Svg, { Path, Circle, G } from 'react-native-svg';
 
 const Container = styled.SafeAreaView`
   flex: 1;
@@ -144,6 +145,8 @@ const ReportScreen = ({ navigation, route }: any) => {
   const [selectedYear, setSelectedYear] = useState(2026);
   const [selectedMonth, setSelectedMonth] = useState(2);
   const [report, setReport] = useState<any>(null);
+  const [userStats, setUserStats] = useState<any>(null);
+  const [statLogs, setStatLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   const months = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
@@ -155,13 +158,68 @@ const ReportScreen = ({ navigation, route }: any) => {
   const fetchReport = async () => {
     setLoading(true);
     try {
-      const response = await axios.get(`${API_URL}/diaries/report?userId=${targetUserId}&requesterId=${userId}&year=${selectedYear}&month=${selectedMonth}`);
-      setReport(response.data);
+      const [reportRes, statsRes, logsRes] = await Promise.all([
+        axios.get(`${API_URL}/diaries/report?userId=${targetUserId}&requesterId=${userId}&year=${selectedYear}&month=${selectedMonth}`),
+        axios.get(`${API_URL}/chat/stats/${targetUserId}`),
+        axios.get(`${API_URL}/chat/stats/${targetUserId}/log`)
+      ]);
+      setReport(reportRes.data);
+      setUserStats(statsRes.data);
+      setStatLogs(logsRes.data || []);
     } catch (error) {
-      console.error('Error fetching report:', error);
+      console.error('Error fetching report/stats/logs:', error);
     } finally {
       setLoading(false);
     }
+  };
+
+  const renderRadarChart = () => {
+    if (!userStats) return null;
+
+    // Simple mapping for radar points
+    const center = 110;
+    const scale = 0.9;
+
+    const points = [
+      { x: center, y: center - (userStats.selfEfficacyXP || 0) * scale }, // Top
+      { x: center + (userStats.emotionalIQXP || 0) * scale * 0.95, y: center - (userStats.emotionalIQXP || 0) * scale * 0.3 }, // Top Right
+      { x: center + (userStats.logicalFrameXP || 0) * scale * 0.58, y: center + (userStats.logicalFrameXP || 0) * scale * 0.8 }, // Bottom Right
+      { x: center - (userStats.socialValueXP || 0) * scale * 0.58, y: center + (userStats.socialValueXP || 0) * scale * 0.8 }, // Bottom Left
+      { x: center - (userStats.creativeInsightXP || 0) * scale * 0.95, y: center - (userStats.creativeInsightXP || 0) * scale * 0.3 }, // Top Left
+    ];
+
+    const d = `M ${points[0].x} ${points[0].y} L ${points[1].x} ${points[1].y} L ${points[2].x} ${points[2].y} L ${points[3].x} ${points[3].y} L ${points[4].x} ${points[4].y} Z`;
+
+    return (
+      <View style={{ alignItems: 'center', marginVertical: theme.spacing.md }}>
+        <Svg height="220" width="220" viewBox="0 0 220 220">
+          <Path d="M110 20 L195 82 L163 182 L57 182 L25 82 Z" fill="none" stroke={theme.colors.secondary} strokeWidth="1" strokeDasharray="4 4" />
+          <Path d="M110 60 L153 91 L137 141 L83 141 L67 91 Z" fill="none" stroke={theme.colors.secondary} strokeWidth="1" strokeDasharray="4 4" />
+          <Path d="M110 110 L110 20 M110 110 L195 82 M110 110 L163 182 M110 110 L57 182 M110 110 L25 82" stroke={theme.colors.secondary} strokeWidth="0.5" />
+          <Path d={d} fill={theme.colors.primary} fillOpacity={0.2} stroke={theme.colors.primary} strokeWidth="2" />
+
+          <G transform="translate(100, 5)">
+            <Circle cx="10" cy="110" r="0" />
+            <Text style={{ fontSize: 10, color: theme.colors.primary, fontWeight: 'bold' }}>자아</Text>
+          </G>
+        </Svg>
+        {/* Simple Labels outside SVG for better text rendering support in some RN envs if needed, but SVG text is fine too */}
+        <View style={{ flexDirection: 'row', justifyContent: 'space-around', width: '100%', marginTop: 10 }}>
+          {[
+            { label: '자아', value: userStats.selfEfficacyXP },
+            { label: '감정', value: userStats.emotionalIQXP },
+            { label: '논리', value: userStats.logicalFrameXP },
+            { label: '사회', value: userStats.socialValueXP },
+            { label: '창의', value: userStats.creativeInsightXP }
+          ].map((stat, i) => (
+            <View key={i} style={{ alignItems: 'center', width: '20%' }}>
+              <Text style={{ fontSize: 12, fontWeight: 'bold', color: theme.colors.primary }}>{stat.label}</Text>
+              <Text style={{ fontSize: 10, color: theme.colors.text.secondary }}>{stat.value || 0}</Text>
+            </View>
+          ))}
+        </View>
+      </View>
+    );
   };
 
   if (loading && !report) {
@@ -196,6 +254,11 @@ const ReportScreen = ({ navigation, route }: any) => {
             </MonthChip>
           ))}
         </MonthSelector>
+
+        <Section>
+          <SectionTitle>5-Tool 역량 성장도</SectionTitle>
+          {renderRadarChart()}
+        </Section>
 
         {report && report.totalDiaries > 0 ? (
           <>
@@ -247,6 +310,78 @@ const ReportScreen = ({ navigation, route }: any) => {
             </Text>
           </View>
         )}
+
+        {/* 성장 타임라인 섹션 */}
+        <Section>
+          <SectionTitle>아이의 성장 모먼트 👣</SectionTitle>
+          {statLogs && statLogs.length > 0 ? (
+            statLogs.map((log, index) => (
+              <View
+                key={log.id || index}
+                style={{
+                  flexDirection: 'row',
+                  marginBottom: 20,
+                  borderLeftWidth: 2,
+                  borderLeftColor: theme.colors.primary + '30',
+                  paddingLeft: 15,
+                  marginLeft: 5
+                }}
+              >
+                {/* Timeline Dot */}
+                <View style={{
+                  position: 'absolute',
+                  left: -6,
+                  top: 0,
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: theme.colors.primary
+                }} />
+
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, color: theme.colors.text.disabled, marginBottom: 4 }}>
+                    {new Date(log.createdAt).toLocaleDateString()} • {log.bookTitle || '추억 속의 책'}
+                  </Text>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6, flexWrap: 'wrap' }}>
+                    <View style={{
+                      backgroundColor: theme.colors.secondary,
+                      paddingHorizontal: 6,
+                      paddingVertical: 2,
+                      borderRadius: 4,
+                      marginRight: 8
+                    }}>
+                      <Text style={{ fontSize: 10, fontWeight: 'bold', color: theme.colors.primary }}>
+                        {log.category.replace('XP', '').toUpperCase()}
+                      </Text>
+                    </View>
+                    <Text style={{ fontSize: 14, fontWeight: 'bold', color: theme.colors.text.primary, flex: 1 }}>
+                      {log.reason}
+                    </Text>
+                  </View>
+
+                  <View style={{
+                    backgroundColor: theme.colors.background,
+                    padding: 10,
+                    borderRadius: 8,
+                    borderLeftWidth: 3,
+                    borderLeftColor: theme.colors.accent
+                  }}>
+                    <Text style={{ fontSize: 14, fontStyle: 'italic', color: theme.colors.text.secondary }}>
+                      " {log.evidence} "
+                    </Text>
+                  </View>
+                </View>
+              </View>
+            ))
+          ) : (
+            <View style={{ padding: 20, alignItems: 'center' }}>
+              <Text style={{ color: theme.colors.text.disabled, fontSize: 14 }}>
+                아이와 대화하면 기특한 한마디가 여기에 기록돼요!
+              </Text>
+            </View>
+          )}
+        </Section>
 
         <TouchableOpacity
           style={{

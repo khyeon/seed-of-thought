@@ -1,11 +1,12 @@
 import React from 'react';
-import { ScrollView, View, Text, TouchableOpacity } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import styled from 'styled-components/native';
 import { theme } from '../styles/theme';
-import { Plus, Settings, BookOpen, CheckCircle, List } from 'lucide-react-native';
+import { Plus, Settings, BookOpen, CheckCircle, List, Trophy, Leaf } from 'lucide-react-native';
 import { useUserStore } from '../store/userStore';
 import axios from 'axios';
 import { API_URL } from '../config/apiConfig';
+import Svg, { Path, Circle, G, Text as SvgText } from 'react-native-svg';
 
 const Container = styled.SafeAreaView`
   flex: 1;
@@ -153,6 +154,8 @@ const HomeScreen = ({ navigation }: any) => {
   const { userName, role, userId, clearUser } = useUserStore();
   const [children, setChildren] = React.useState<any[]>([]);
   const [counts, setCounts] = React.useState({ READING: 0, COMPLETED: 0 });
+  const [userStats, setUserStats] = React.useState<any>(null);
+  const [loadingStats, setLoadingStats] = React.useState(false);
 
   const refineName = (name: string | null) => {
     if (!name) return '';
@@ -168,6 +171,7 @@ const HomeScreen = ({ navigation }: any) => {
         fetchFamily();
       } else {
         fetchCounts();
+        fetchStats();
       }
     });
     return unsubscribe;
@@ -182,6 +186,18 @@ const HomeScreen = ({ navigation }: any) => {
     }
   };
 
+  const fetchStats = async () => {
+    setLoadingStats(true);
+    try {
+      const response = await axios.get(`${API_URL}/chat/stats/${userId}`);
+      setUserStats(response.data);
+    } catch (e) {
+      console.error('Failed to fetch stats', e);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
   const fetchFamily = async () => {
     try {
       const response = await axios.get(`${API_URL}/diaries/family/members?userId=${userId}`);
@@ -193,6 +209,100 @@ const HomeScreen = ({ navigation }: any) => {
 
   const handleLogout = () => {
     clearUser();
+  };
+
+  const renderHomeRadarChart = () => {
+    if (!userStats) return null;
+
+    const chartSize = Dimensions.get('window').width - 40;
+    const center = chartSize / 2;
+    const radius = chartSize * 0.3;
+    const angleStep = (Math.PI * 2) / 5;
+
+    // Use normalized values for visualization (max 100)
+    const statsData = [
+      userStats.selfEfficacyXP || 10,
+      userStats.emotionalIQXP || 10,
+      userStats.logicalFrameXP || 10,
+      userStats.socialValueXP || 10,
+      userStats.creativeInsightXP || 10,
+    ];
+
+    const points = statsData.map((val, i) => {
+      const r = (Math.min(val, 100) / 100) * radius + 10; // minimum radius for visibility
+      const x = center + r * Math.cos(i * angleStep - Math.PI / 2);
+      const y = center + r * Math.sin(i * angleStep - Math.PI / 2);
+      return `${x},${y}`;
+    }).join(' ');
+
+    return (
+      <View
+        style={{
+          backgroundColor: theme.colors.white,
+          borderRadius: theme.borderRadius.lg,
+          padding: 20,
+          marginBottom: 20,
+          alignItems: 'center',
+          ...theme.shadows.soft
+        }}
+      >
+        <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.primary, marginBottom: 10 }}>
+          나의 생각 성장 보석 ✨
+        </Text>
+        <Svg height={chartSize} width={chartSize} viewBox={`0 0 ${chartSize} ${chartSize}`}>
+          {/* Background Grid */}
+          {[0.4, 0.7, 1].map((step, idx) => (
+            <Path
+              key={idx}
+              d={Array.from({ length: 5 }).map((_, i) => {
+                const x = center + radius * step * Math.cos(i * angleStep - Math.PI / 2);
+                const y = center + radius * step * Math.sin(i * angleStep - Math.PI / 2);
+                return `${i === 0 ? 'M' : 'L'}${x},${y}`;
+              }).join(' ') + 'Z'}
+              fill="none"
+              stroke={theme.colors.secondary}
+              strokeWidth="1"
+              opacity={0.2}
+            />
+          ))}
+
+          {/* Radar Shape */}
+          <Path
+            d={`M${points.split(' ')[0]} L${points.split(' ').slice(1).join(' L ')} Z`}
+            fill={theme.colors.primary}
+            fillOpacity={0.4}
+            stroke={theme.colors.primary}
+            strokeWidth="2"
+          />
+
+          {/* Labels */}
+          {['자아', '감정', '논리', '사회', '창의'].map((label, i) => {
+            const x = center + (radius + 40) * Math.cos(i * angleStep - Math.PI / 2);
+            const y = center + (radius + 40) * Math.sin(i * angleStep - Math.PI / 2);
+            return (
+              <G key={i}>
+                <Circle
+                  cx={center + radius * Math.cos(i * angleStep - Math.PI / 2)}
+                  cy={center + radius * Math.sin(i * angleStep - Math.PI / 2)}
+                  r="3"
+                  fill={theme.colors.secondary}
+                />
+                <SvgText
+                  x={x}
+                  y={y + 5}
+                  fontSize="12"
+                  fontWeight="bold"
+                  fill={theme.colors.primary}
+                  textAnchor="middle"
+                >
+                  {label}
+                </SvgText>
+              </G>
+            );
+          })}
+        </Svg>
+      </View>
+    );
   };
 
   return (
@@ -225,9 +335,10 @@ const HomeScreen = ({ navigation }: any) => {
               </StatCard>
             </StatRow>
 
+            {/* 1. 오늘 최고의 문장 심기 */}
             <MainActionCard primary onPress={() => navigation.navigate('BookSelection')}>
               <ActionIconContainer primary>
-                <BookOpen size={24} color={theme.colors.white} />
+                <Leaf size={24} color={theme.colors.white} />
               </ActionIconContainer>
               <ActionTextContainer>
                 <ActionTitle primary>오늘 최고의 문장 심기</ActionTitle>
@@ -235,6 +346,7 @@ const HomeScreen = ({ navigation }: any) => {
               </ActionTextContainer>
             </MainActionCard>
 
+            {/* 2. 읽을 책 담기 */}
             <MainActionCard onPress={() => navigation.navigate('BookSearch')}>
               <ActionIconContainer>
                 <Plus size={24} color={theme.colors.primary} />
@@ -245,20 +357,20 @@ const HomeScreen = ({ navigation }: any) => {
               </ActionTextContainer>
             </MainActionCard>
 
-            <View style={{ marginTop: 20 }}>
-              <RecentHeader>
-                <RecentTitle>최근 나의 생각</RecentTitle>
-                <TouchableOpacity onPress={() => navigation.navigate('Archive')}>
-                  <Text style={{ color: theme.colors.primary, fontWeight: 'bold' }}>전체보기</Text>
-                </TouchableOpacity>
-              </RecentHeader>
+            {/* 3. 나의 생각 보관소 */}
+            <View style={{ marginTop: 10 }}>
               <DiaryCard as={TouchableOpacity} activeOpacity={0.7} onPress={() => navigation.navigate('Archive')}>
                 <DiaryIcon><Text style={{ fontSize: 24 }}>🍏</Text></DiaryIcon>
                 <DiaryInfo>
-                  <DiaryTitle>내 생각들이 열매를 맺고 있어요</DiaryTitle>
-                  <DiaryDate>보관소에서 확인해봐요!</DiaryDate>
+                  <DiaryTitle>나의 생각 보관소</DiaryTitle>
+                  <DiaryDate>지금까지 모은 생각 열매들을 확인해봐요!</DiaryDate>
                 </DiaryInfo>
               </DiaryCard>
+            </View>
+
+            {/* 4. 나의 생각 성장 보석 (가장 하단) */}
+            <View style={{ marginTop: 10 }}>
+              {renderHomeRadarChart()}
             </View>
           </DashboardContainer>
         ) : (
@@ -269,8 +381,8 @@ const HomeScreen = ({ navigation }: any) => {
                 <DiaryCard key={child.id} as={TouchableOpacity} activeOpacity={0.7} onPress={() => navigation.navigate('Report', { targetUserId: child.id, targetUserName: refineName(child.name) })}>
                   <DiaryIcon><Text style={{ fontSize: 24 }}>🧒</Text></DiaryIcon>
                   <DiaryInfo>
-                    <DiaryTitle>{refineName(child.name)}의 정원</DiaryTitle>
-                    <DiaryDate>최근 활동을 확인해보세요</DiaryDate>
+                    <DiaryTitle>{refineName(child.name)}의 생각 정원</DiaryTitle>
+                    <DiaryDate>오늘 아이의 내면 성장 리포트를 확인하세요</DiaryDate>
                   </DiaryInfo>
                 </DiaryCard>
               ))

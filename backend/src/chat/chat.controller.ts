@@ -23,4 +23,19 @@ export class ChatController {
             body.plot
         );
     }
+
+    @Get('stats/:userId')
+    async getStats(@Param('userId') userId: string) {
+        return this.chatService.getUserStats(userId);
+    }
+
+    @Get('stats/:userId/log')
+    async getStatsLog(@Param('userId') userId: string) {
+        return this.chatService.getUserStatsLog(userId);
+    }
+
+    @Get('tree/:userId')
+    async getTreeState(@Param('userId') userId: string) {
+        return this.chatService.getTreeState(userId);
+    }
 }

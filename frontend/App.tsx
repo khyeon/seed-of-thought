@@ -16,6 +16,7 @@ import BookAddedSuccessScreen from './src/screens/BookAddedSuccessScreen';
 import BookSelectionScreen from './src/screens/BookSelectionScreen';
 import ReadingListScreen from './src/screens/ReadingListScreen';
 import CompletedListScreen from './src/screens/CompletedListScreen';
+import GemGardenScreen from './src/screens/GemGardenScreen';
 import { useUserStore } from './src/store/userStore';
 
 const Stack = createNativeStackNavigator();
@@ -45,6 +46,7 @@ function App() {
               <Stack.Screen name="BookSelection" component={BookSelectionScreen} />
               <Stack.Screen name="ReadingList" component={ReadingListScreen} />
               <Stack.Screen name="CompletedList" component={CompletedListScreen} />
+              <Stack.Screen name="GemGarden" component={GemGardenScreen} />
             </>
           )}
         </Stack.Navigator>
