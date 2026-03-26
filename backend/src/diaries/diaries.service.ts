@@ -42,8 +42,12 @@ export class DiariesService {
             .join('\n');
 
         const prompt = `
-      아래의 대화 내용을 바탕으로 아이가 쓴 것처럼 자연스러운 일기 3~5문장을 만들어줘.
-      중요한 점은 아이의 감정과 생각이 잘 드러나야 한다는 거야.
+      지금까지의 대화 내용을 분석해서, 아이가 스스로 일기를 쓸 수 있도록 돕는 키워드를 추출해줘.
+      일기의 본문(content)은 아이가 직접 쓸 것이므로 빈 문자열로 남겨둬.
+      대신, 대화에서 나온 가장 중요한 단어들을 아래 두 가지 범주로 나누어 추출해줘:
+      1) 객관적 사실(Fact): 책 내용, 등장인물, 줄거리, 사건 등 (3~4개)
+      2) 주관적 생각(Insight): 감정, 깨달음, 다짐, 느낀점 등 (3~4개)
+      *모든 키워드는 조사(은,는,이,가 등)를 제외한 5글자 이하의 '명사' 형태로만 작성해.*
       
       [대화 내용]
       ${conversation}
@@ -51,9 +55,10 @@ export class DiariesService {
       [결과 형식 (JSON)]
       반드시 아래와 같은 JSON 형식으로만 응답해줘. 다른 설명은 하지 마:
       {
-        "content": "일기 내용",
+        "content": "",
         "emotion": "대표 감정 (기쁨, 슬픔, 깨달음, 신기함 중 하나)",
-        "keywords": ["키워드1", "키워드2", "키워드3"],
+        "factKeywords": ["키워드1", "키워드2"],
+        "insightKeywords": ["키워드3", "키워드4"],
         "summary": "부모님을 위한 1문장 요약"
       }
     `;
@@ -70,7 +75,11 @@ export class DiariesService {
             });
 
             const responseText = completion.choices[0]?.message?.content || "{}";
-            return JSON.parse(responseText);
+            const parsed = JSON.parse(responseText);
+            return {
+                ...parsed,
+                messages: chatRoom.messages || [],
+            };
         } catch (error) {
             console.error('Groq Diary Generation Error:', error);
             return this.getMockDraft(chatRoom);
@@ -81,10 +90,12 @@ export class DiariesService {
         const bookTitle = chatRoom.seed.bookTitle;
         const sentence = chatRoom.seed.sentence;
         return {
-            content: `오늘은 '${bookTitle}'을(를) 읽고 이야기를 나눴어. "${sentence}"라는 문장이 가장 기억에 남았는데, 평소에 소중한 걸 잊고 살았던 건 아닌지 생각해보게 됐어. 앞으로는 내 주변의 소중한 것들을 더 아껴줘야지!`,
+            content: "",
             emotion: "깨달음",
-            keywords: [bookTitle, "소중함", "생각"],
-            summary: "아이가 책 속 문장을 통해 주변의 소중함을 다시 한번 생각해보는 뜻깊은 시간을 가졌습니다."
+            factKeywords: [bookTitle, "문장", "책"],
+            insightKeywords: ["소중함", "생각", "다짐"],
+            summary: "아이가 책 속 문장을 통해 주변의 소중함을 다시 한번 생각해보는 뜻깊은 시간을 가졌습니다.",
+            messages: chatRoom.messages || [],
         };
     }
 
@@ -158,7 +169,12 @@ export class DiariesService {
             orderBy: { createdAt: 'desc' },
             include: {
                 chatRoom: {
-                    include: { seed: true },
+                    include: {
+                        seed: true,
+                        messages: {
+                            orderBy: { createdAt: 'asc' },
+                        },
+                    },
                 },
             },
         });
