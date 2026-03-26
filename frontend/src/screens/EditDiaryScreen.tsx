@@ -93,31 +93,81 @@ const DiaryInput = styled.TextInput`
   text-align-vertical: top;
 `;
 
-const KeywordContainer = styled.View`
-  flex-direction: row;
-  flex-wrap: wrap;
-  margin-top: ${theme.spacing.lg}px;
+const GuideMessage = styled.Text`
+  font-size: 15px;
+  line-height: 22px;
+  color: ${theme.colors.text.secondary};
+  margin-bottom: ${theme.spacing.md}px;
+  background-color: ${theme.colors.background};
+  padding: ${theme.spacing.md}px;
+  border-radius: ${theme.borderRadius.md}px;
 `;
 
-const Keyword = styled.Text`
+const BadgeSection = styled.View`
+  margin-bottom: ${theme.spacing.lg}px;
+`;
+
+const BadgeRow = styled.View`
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: ${theme.spacing.sm}px;
+`;
+
+const BadgeLabel = styled.Text`
+  font-size: 12px;
+  font-weight: bold;
   color: ${theme.colors.text.secondary};
-  background-color: ${theme.colors.secondary};
+  margin-right: ${theme.spacing.sm}px;
+  width: 50px;
+`;
+
+const FactBadge = styled.View`
+  background-color: #E3F2FD;
   padding: ${theme.spacing.xs}px ${theme.spacing.sm}px;
   border-radius: ${theme.borderRadius.sm}px;
   margin-right: ${theme.spacing.sm}px;
-  margin-bottom: ${theme.spacing.sm}px;
-  font-size: 12px;
+  margin-bottom: 4px;
 `;
 
-const SaveButton = styled.TouchableOpacity`
-  background-color: ${theme.colors.primary};
+const FactBadgeText = styled.Text`
+  color: #1976D2;
+  font-size: 13px;
+  font-weight: bold;
+`;
+
+const InsightBadge = styled.View`
+  background-color: #FFF3E0;
+  padding: ${theme.spacing.xs}px ${theme.spacing.sm}px;
+  border-radius: ${theme.borderRadius.sm}px;
+  margin-right: ${theme.spacing.sm}px;
+  margin-bottom: 4px;
+`;
+
+const InsightBadgeText = styled.Text`
+  color: #F57C00;
+  font-size: 13px;
+  font-weight: bold;
+`;
+
+const CharCounter = styled.Text<{ $isValid: boolean }>`
+  text-align: right;
+  font-size: 13px;
+  margin-top: ${theme.spacing.sm}px;
+  color: ${props => props.$isValid ? theme.colors.primary : '#F44336'};
+  font-weight: ${props => props.$isValid ? 'bold' : 'normal'};
+`;
+
+const SaveButton = styled.TouchableOpacity<{ $isPending?: boolean }>`
+  background-color: ${props => props.$isPending ? '#ccc' : theme.colors.primary};
   border-radius: ${theme.borderRadius.full}px;
   padding: ${theme.spacing.md}px;
   flex-direction: row;
   justify-content: center;
   align-items: center;
   margin-bottom: 40px;
-  ${theme.shadows.soft};
+  opacity: ${props => props.$isPending ? 0.7 : 1};
+  ${props => !props.$isPending && theme.shadows.soft};
 `;
 
 const SaveButtonText = styled.Text`
@@ -154,18 +204,24 @@ const EditDiaryScreen = ({ route, navigation }: any) => {
 
   const handleSave = async () => {
     console.log('AIChat - handleSave: Start saving process');
-    if (!content.trim()) {
-      Alert.alert('안내', '일기 내용을 입력해 주세요!');
+    const textLength = content.trim().length;
+    if (textLength < 200) {
+      Alert.alert('조금만 더!', `멋진 감상문을 완성하기 위해 200자 이상 적어보자! (현재 ${textLength}자)`);
       return;
     }
     setSaving(true);
     try {
+      const combinedKeywords = [
+        ...(diaryData?.factKeywords || []),
+        ...(diaryData?.insightKeywords || [])
+      ];
+
       const savePayload = {
         userId,
         chatRoomId,
         content: content.trim(),
         emotion: diaryData?.emotion,
-        keywords: diaryData?.keywords,
+        keywords: combinedKeywords.length > 0 ? combinedKeywords : diaryData?.keywords,
         summary: diaryData?.summary,
         imageUrl: book.thumbnail,
       };
@@ -223,21 +279,43 @@ const EditDiaryScreen = ({ route, navigation }: any) => {
             </BookInfo>
           </BookHeader>
 
+          {diaryData && (<>
+            <GuideMessage>
+              우와! 오늘 책에 대해 깊게 대화하면서 네가 이렇게 멋진 생각 조각들을 찾아냈어! 이 조각들을 모아서 200자 이상의 진짜 작가 같은 감상문으로 완성해 볼까?
+            </GuideMessage>
+
+            <BadgeSection>
+              {diaryData.factKeywords && diaryData.factKeywords.length > 0 && (
+                <BadgeRow>
+                  <BadgeLabel>🔵 사건</BadgeLabel>
+                  {diaryData.factKeywords.map((kw: string, index: number) => (
+                    <FactBadge key={`fact-${index}`}><FactBadgeText>{kw}</FactBadgeText></FactBadge>
+                  ))}
+                </BadgeRow>
+              )}
+              {diaryData.insightKeywords && diaryData.insightKeywords.length > 0 && (
+                <BadgeRow>
+                  <BadgeLabel>🌟 생각</BadgeLabel>
+                  {diaryData.insightKeywords.map((kw: string, index: number) => (
+                    <InsightBadge key={`insight-${index}`}><InsightBadgeText>{kw}</InsightBadgeText></InsightBadge>
+                  ))}
+                </BadgeRow>
+              )}
+            </BadgeSection>
+          </>)}
+
           <DiaryInput
             multiline
             value={content}
             onChangeText={setContent}
-            placeholder="여기에 일기 내용을 적어줘..."
+            placeholder="파란색 보석(사건)과 노란색 보석(생각)을 연결해서 진짜 멋진 200자 감상문을 만들어봐!"
           />
-
-          <KeywordContainer>
-            {diaryData?.keywords?.map((kw: string, index: number) => (
-              <Keyword key={index}>#{kw}</Keyword>
-            ))}
-          </KeywordContainer>
+          <CharCounter $isValid={content.trim().length >= 200}>
+            ( 현재 {content.trim().length} 자 / 목표 200 자 )
+          </CharCounter>
         </Card>
 
-        <SaveButton onPress={handleSave} disabled={saving}>
+        <SaveButton onPress={handleSave} disabled={saving} $isPending={saving || content.trim().length < 200}>
           {saving ? (
             <ActivityIndicator color={theme.colors.white} />
           ) : (

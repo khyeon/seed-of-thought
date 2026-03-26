@@ -2,7 +2,7 @@ import React from 'react';
 import { ScrollView, View, Text, TouchableOpacity, Image } from 'react-native';
 import styled from 'styled-components/native';
 import { theme } from '../styles/theme';
-import { ChevronLeft, Calendar, Book, Quote } from 'lucide-react-native';
+import { ChevronLeft, Calendar, Book, Quote, MessageCircle } from 'lucide-react-native';
 
 const Container = styled.SafeAreaView`
   flex: 1;
@@ -118,6 +118,29 @@ const TagText = styled.Text`
   font-weight: bold;
 `;
 
+const ChatContainer = styled.View`
+  background-color: ${theme.colors.background};
+  border-radius: ${theme.borderRadius.md}px;
+  padding: ${theme.spacing.lg}px;
+  margin-top: ${theme.spacing.xl}px;
+`;
+
+const ChatBubble = styled.View<{ $isAi: boolean }>`
+  background-color: ${props => props.$isAi ? theme.colors.white : theme.colors.primary + '20'};
+  padding: ${theme.spacing.md}px;
+  border-radius: ${theme.borderRadius.lg}px;
+  margin-bottom: ${theme.spacing.md}px;
+  align-self: ${props => props.$isAi ? 'flex-start' : 'flex-end'};
+  max-width: 85%;
+  ${theme.shadows.soft};
+`;
+
+const ChatText = styled.Text`
+  font-size: 15px;
+  color: ${theme.colors.text.primary};
+  line-height: 24px;
+`;
+
 const DiaryDetailScreen = ({ navigation, route }: any) => {
   const { diary } = route.params || {};
 
@@ -194,6 +217,23 @@ const DiaryDetailScreen = ({ navigation, route }: any) => {
             )}
           </TagContainer>
         </Card>
+
+        {diary.chatRoom?.messages && diary.chatRoom.messages.length > 0 && (
+          <Card style={{ marginTop: 0 }}>
+            <SectionTitle>
+              <MessageCircle size={16} color={theme.colors.primary} />
+              <SectionLabel>이날 나눈 대화</SectionLabel>
+            </SectionTitle>
+
+            <ChatContainer>
+              {diary.chatRoom.messages.map((msg: any, index: number) => (
+                <ChatBubble key={`msg-${index}`} $isAi={msg.sender === 'AI'}>
+                  <ChatText>{msg.content}</ChatText>
+                </ChatBubble>
+              ))}
+            </ChatContainer>
+          </Card>
+        )}
 
         <TouchableOpacity
           style={{
