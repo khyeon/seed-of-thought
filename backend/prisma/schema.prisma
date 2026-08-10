@@ -84,6 +84,7 @@ model Diary {
   updatedAt  DateTime @updatedAt
   chatRoom   ChatRoom @relation(fields: [chatRoomId], references: [id])
   user       User     @relation(fields: [userId], references: [id])
+  correction DiaryCorrection?
 }
 
 model UserBook {
@@ -152,4 +153,32 @@ model TreeState {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
   user         User     @relation(fields: [userId], references: [id])
+}
+
+model DiaryCorrection {
+  id               String                @id @default(uuid())
+  diaryId          String                @unique
+  originalContent  String
+  correctedContent String?
+  aiReport         String?
+  status           String                @default("PENDING") // PENDING, IN_PROGRESS, COMPLETED
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  items            DiaryCorrectionItem[]
+  diary            Diary                 @relation(fields: [diaryId], references: [id], onDelete: Cascade)
+}
+
+model DiaryCorrectionItem {
+  id                String          @id @default(uuid())
+  correctionId      String
+  sentenceIndex     Int
+  originalSentence  String
+  correctedSentence String?
+  correctionType    String          // CONTEXT, LOGIC, MANUAL
+  issueDescription  String
+  aiQuestion        String
+  aiSuggestions     String          // JSON array of strings
+  userHint          String?
+  status            String          @default("PENDING") // PENDING, RESOLVED, SKIPPED
+  correction        DiaryCorrection @relation(fields: [correctionId], references: [id], onDelete: Cascade)
 }
