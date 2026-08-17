@@ -311,27 +311,53 @@ const DiaryDetailScreen = ({ navigation, route }: any) => {
 
   const renderDiaryContent = () => {
     if (viewMode === 'corrected' && correctionData?.correctedContent) {
-      const correctedSentences = splitIntoSentences(correctionData.correctedContent);
+      const fullText = correctionData.correctedContent;
+      const resolvedItems = correctionData.items?.filter((item: any) => item.status === 'RESOLVED' && item.correctedSentence) || [];
+      
+      if (resolvedItems.length === 0) {
+        return (
+          <Text style={{ fontSize: 16, color: theme.colors.text.primary, lineHeight: 26 }}>
+            {fullText}
+          </Text>
+        );
+      }
+
+      // Sort by length descending to replace larger chunks first
+      const sortedItems = [...resolvedItems].sort((a, b) => b.correctedSentence.length - a.correctedSentence.length);
+      let tempText = fullText;
+      const itemMap = new Map<string, any>();
+
+      sortedItems.forEach((item) => {
+        const token = `__CORRECTION_ITEM_${item.id}__`;
+        itemMap.set(token, item);
+        const escaped = item.correctedSentence.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        tempText = tempText.replace(new RegExp(escaped, 'g'), token);
+      });
+
+      const tokens = Array.from(itemMap.keys());
+      const regex = new RegExp(`(${tokens.join('|')})`, 'g');
+      const parts = tempText.split(regex);
+
       return (
         <View style={{ flexWrap: 'wrap', flexDirection: 'row', alignItems: 'center' }}>
-          {correctedSentences.map((sentence, index) => {
-            const correctionInfo = originalItemsMap.get(index);
-            if (correctionInfo) {
+          {parts.map((part, index) => {
+            if (itemMap.has(part)) {
+              const item = itemMap.get(part);
               return (
                 <TouchableOpacity 
                   key={`corr-touch-${index}`}
-                  onPress={() => handleCorrectedSentencePress(sentence, correctionInfo.original)}
-                  style={{ backgroundColor: '#FFF9C4', paddingHorizontal: 4, marginVertical: 2, borderRadius: 4 }}
+                  onPress={() => handleCorrectedSentencePress(item.correctedSentence, item.originalSentence)}
+                  style={{ backgroundColor: '#FFF9C4', paddingHorizontal: 4, marginVertical: 2, borderRadius: 4, marginRight: 4 }}
                 >
                   <Text style={{ fontSize: 16, color: theme.colors.text.primary, fontWeight: 'bold', textDecorationLine: 'underline' }}>
-                    {sentence}
+                    {item.correctedSentence}
                   </Text>
                 </TouchableOpacity>
               );
             }
             return (
               <Text key={`corr-flat-${index}`} style={{ fontSize: 16, color: theme.colors.text.primary, lineHeight: 26 }}>
-                {sentence}{' '}
+                {part}{' '}
               </Text>
             );
           })}

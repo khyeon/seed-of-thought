@@ -71,19 +71,25 @@ export class DiariesCorrectionService {
             분석할 문장 리스트:
             ${sentenceListStr}
 
-            위 문장 중 다음 2가지 유형 중 하나에 해당하는 문장들을 추출하십시오.
-            1. CONTEXT: 행동이나 감정의 이유/배경이 빠져서 이해하기 어려운 문장.
-            2. LOGIC: 인과 관계가 비약되어 어색한 문장.
+            [기능 설명: 의미 덩어리(Semantic Chunk) 그룹화]
+            * 문장 하나하나를 따로 보지 말고, 의미나 화제가 연결되어 같이 쓰인 2~3개의 문장들을 하나의 덩어리로 묶어서 분석하십시오.
+            * 일기 내용 전체가 하나의 흐름일 경우, 전체 일기(모든 문장)를 1개의 덩어리로 묶는 것도 허용합니다.
+            * 만약 일기에 마침표(., !, ?)가 전혀 없거나 거의 없는 경우에도 문맥에 따라 어색한 의미 구문 덩어리를 추출하고 startSentenceIndex와 endSentenceIndex를 모두 0으로 반환하십시오.
 
-            *주의: 어색하지 않은 문장은 결과 리스트에 포함하지 마십시오.
+            위 일기 중 다음 2가지 유형 중 하나에 해당하는 의미 덩어리들을 추출하십시오.
+            1. CONTEXT: 행동이나 감정의 이유/배경이 빠져서 이해하기 어려운 덩어리.
+            2. LOGIC: 인과 관계가 비약되어 어색한 덩어리.
+
+            *주의: 어색하지 않은 문장이나 덩어리는 결과 리스트에 포함하지 마십시오.
             *조건: 아이에게 지적이나 지시조의 피드백을 주지 마세요. 아주 친절하고 칭찬을 가미해 말하세요.
 
             반드시 아래와 같은 JSON 형식으로만 응답해야 합니다. 다른 텍스트는 포함하지 마십시오:
             {
               "items": [
                 {
-                  "sentenceIndex": 0,
-                  "originalSentence": "문장 내용",
+                  "startSentenceIndex": 0,
+                  "endSentenceIndex": 2,
+                  "originalSentence": "오늘 축구를 했다. 너무 신났다. 골을 넣었다.",
                   "correctionType": "CONTEXT 또는 LOGIC",
                   "issueDescription": "아이 눈높이에서의 친절한 피드백 (예: '~해서 이해하기 조금 어려워요')",
                   "aiQuestion": "아이의 생각을 확장해 주는 다정한 질문 (예: '왜 그렇게 생각했어?')",
@@ -109,16 +115,26 @@ export class DiariesCorrectionService {
 
                 if (parsed.items && Array.isArray(parsed.items)) {
                     for (const item of parsed.items) {
-                        const sIdx = parseInt(item.sentenceIndex);
-                        if (isNaN(sIdx) || sIdx < 0 || sIdx >= sentences.length) continue;
+                        const startIdx = parseInt(item.startSentenceIndex);
+                        const endIdx = parseInt(item.endSentenceIndex);
+                        
+                        if (isNaN(startIdx) || startIdx < 0 || startIdx >= sentences.length) continue;
+                        const safeEndIdx = isNaN(endIdx) ? startIdx : Math.min(Math.max(startIdx, endIdx), sentences.length - 1);
+
+                        // If it is multi-sentence range, originalSentence should cover all of them
+                        let finalOriginalText = item.originalSentence;
+                        if (sentences.length > 1 && startIdx !== safeEndIdx) {
+                            finalOriginalText = sentences.slice(startIdx, safeEndIdx + 1).join(' ');
+                        }
 
                         const createdItem = await this.prisma.diaryCorrectionItem.create({
                             data: {
                                 correctionId: correction.id,
-                                sentenceIndex: sIdx,
-                                originalSentence: sentences[sIdx],
+                                sentenceIndex: startIdx,
+                                endSentenceIndex: safeEndIdx,
+                                originalSentence: finalOriginalText || sentences[startIdx],
                                 correctionType: item.correctionType || 'CONTEXT',
-                                issueDescription: item.issueDescription || '이 문장을 조금 더 다듬어 볼까?',
+                                issueDescription: item.issueDescription || '이 부분을 조금 더 다듬어 볼까?',
                                 aiQuestion: item.aiQuestion || '어떤 일이 더 있었는지 적어보자.',
                                 aiSuggestions: JSON.stringify(item.aiSuggestions || []),
                                 status: 'PENDING',
@@ -132,23 +148,22 @@ export class DiariesCorrectionService {
             }
         }
 
-        // If no AI items were created (e.g. mock or Groq failure/none found)
+        // Fallback dummy item creation
         if (items.length === 0) {
-            // Create at least one dummy/guided item for testing or fallback
-            // Let's create a CONTEXT item for the last sentence if there's any
             const lastIdx = sentences.length - 1;
             if (lastIdx >= 0) {
                 const fallbackItem = await this.prisma.diaryCorrectionItem.create({
                     data: {
                         correctionId: correction.id,
-                        sentenceIndex: lastIdx,
-                        originalSentence: sentences[lastIdx],
+                        sentenceIndex: 0,
+                        endSentenceIndex: lastIdx,
+                        originalSentence: diary.content,
                         correctionType: 'CONTEXT',
-                        issueDescription: '이 문장에 네 마음이나 있었던 일의 이유를 더 써볼까?',
-                        aiQuestion: '이때 어떤 기분이었어? 한 번 더 이야기해 줘!',
+                        issueDescription: '이 글에 네 생각이나 감정을 조금만 더 자세히 써볼까?',
+                        aiQuestion: '이때 어떤 기분이었는지 이야기해 줘!',
                         aiSuggestions: JSON.stringify([
-                            `${sentences[lastIdx].replace(/[.!?]/g, '')} 왜냐하면 정말 즐거웠기 때문이다.`,
-                            `${sentences[lastIdx].replace(/[.!?]/g, '')} 느낌이 너무 신기했다.`
+                            `${diary.content.trim()} 왜냐하면 정말 뜻깊은 날이었기 때문이다.`,
+                            `${diary.content.trim()} 다음에도 꼭 다시 해보고 싶다.`
                         ]),
                         status: 'PENDING',
                     },
@@ -176,9 +191,10 @@ export class DiariesCorrectionService {
             data: {
                 correctionId: correction.id,
                 sentenceIndex: data.sentenceIndex,
+                endSentenceIndex: data.sentenceIndex, // Default end to start index
                 originalSentence: data.originalSentence,
                 correctionType: 'MANUAL',
-                issueDescription: '이 문장을 우리가 직접 다듬어 보기로 지정했어요.',
+                issueDescription: '이 부분을 우리가 직접 다듬어 보기로 지정했어요.',
                 aiQuestion: data.userHint || '이 문장을 어떻게 바꾸고 싶은가요?',
                 aiSuggestions: JSON.stringify([]),
                 userHint: data.userHint,
@@ -225,23 +241,47 @@ export class DiariesCorrectionService {
         }
 
         const sentences = this.splitIntoSentences(correction.originalContent);
+        let correctedContent = correction.originalContent;
 
-        // Map corrected sentences back
-        const resolvedItemsMap = new Map<number, string>();
-        correction.items.forEach(item => {
-            if (item.status === 'RESOLVED' && item.correctedSentence) {
-                resolvedItemsMap.set(item.sentenceIndex, item.correctedSentence);
+        if (sentences.length <= 1) {
+            // Case 1: Diary has no periods/sentences. Use substring replacement.
+            correction.items.forEach(item => {
+                if (item.status === 'RESOLVED' && item.correctedSentence) {
+                    if (correctedContent.includes(item.originalSentence)) {
+                        correctedContent = correctedContent.replace(item.originalSentence, item.correctedSentence);
+                    } else {
+                        // Hard replace if it's the entire content
+                        correctedContent = item.correctedSentence;
+                    }
+                }
+            });
+        } else {
+            // Case 2: Use index-range replacements.
+            const resolvedMap = new Map<number, { end: number; text: string }>();
+            correction.items.forEach(item => {
+                if (item.status === 'RESOLVED' && item.correctedSentence) {
+                    const endIdx = item.endSentenceIndex !== null ? item.endSentenceIndex : item.sentenceIndex;
+                    resolvedMap.set(item.sentenceIndex, { end: endIdx, text: item.correctedSentence });
+                }
+            });
+
+            const finalSentences: string[] = [];
+            let skipUntil = -1;
+
+            for (let i = 0; i < sentences.length; i++) {
+                if (i <= skipUntil) {
+                    continue;
+                }
+                if (resolvedMap.has(i)) {
+                    const corr = resolvedMap.get(i)!;
+                    finalSentences.push(corr.text);
+                    skipUntil = corr.end;
+                } else {
+                    finalSentences.push(sentences[i]);
+                }
             }
-        });
-
-        const finalSentences = sentences.map((s, index) => {
-            if (resolvedItemsMap.has(index)) {
-                return resolvedItemsMap.get(index)!;
-            }
-            return s;
-        });
-
-        const correctedContent = finalSentences.join(' ');
+            correctedContent = finalSentences.join(' ');
+        }
 
         // Generate AI report using Groq
         let aiReport = '일기가 더 다채롭고 생각이 풍부하게 완성되었어요! 훌륭합니다. 🌟';
@@ -274,8 +314,7 @@ export class DiariesCorrectionService {
             }
         }
 
-        // Update the core Diary model's content to the new corrected version as well
-        // to maintain backward compatibility, and store the revision status.
+        // Update core Diary
         await this.prisma.diary.update({
             where: { id: diaryId },
             data: { content: correctedContent },

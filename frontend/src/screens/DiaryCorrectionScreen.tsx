@@ -363,7 +363,7 @@ const DiaryCorrectionScreen = ({ route, navigation }: any) => {
               </TypeTagText>
             </TypeTag>
 
-            <Label>원래 문장</Label>
+            <Label>원래 쓴 부분</Label>
             <OriginalSentenceBox>
               <OriginalSentenceText>"{currentItem.originalSentence}"</OriginalSentenceText>
             </OriginalSentenceBox>
@@ -373,7 +373,7 @@ const DiaryCorrectionScreen = ({ route, navigation }: any) => {
               <QuestionText>{currentItem.aiQuestion}</QuestionText>
             </PromptBox>
 
-            <Label>다듬을 문장 쓰기</Label>
+            <Label>다듬어서 바꾸기</Label>
             <CustomInput
               multiline
               value={correctedText}

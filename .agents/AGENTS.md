@@ -10,8 +10,8 @@
 
 2. **개발 및 스키마 변경 워크플로우**:
    - **백엔드 시작**: `npm run start:dev` (로컬 개발용)
-   - **Prisma 개발 마이그레이션**: `npm run prisma:dev migrate dev --name <이름>`
-   - **Prisma 운영 마이그레이션**: `npm run prisma:prod migrate deploy` (배포 전 반드시 단독 실행하여 운영 DB 스키마 반영)
+   - **Prisma 개발 스키마 반영**: `npx dotenv-cli -e .env.development -- npx prisma db push` (데이터를 유실하지 않고 스키마를 동기화하기 위해 migrate dev 대신 db push를 필수적으로 사용합니다.)
+   - **Prisma 운영 스키마 반영**: `npx dotenv-cli -e .env.production -- npx prisma db push` (배포 전 반드시 단독 실행하여 운영 DB 스키마 반영)
 
 3. **프론트엔드 환경 스위칭**:
    - `__DEV__` 값에 따라 로컬 백엔드(`localhost:3000`) 또는 실서버 API(`https://seed-of-thought.onrender.com`)로 자동 분기되므로 하드코딩하지 않습니다.
