@@ -172,6 +172,7 @@ model DiaryCorrectionItem {
   id                String          @id @default(uuid())
   correctionId      String
   sentenceIndex     Int
+  endSentenceIndex  Int?
   originalSentence  String
   correctedSentence String?
   correctionType    String          // CONTEXT, LOGIC, MANUAL

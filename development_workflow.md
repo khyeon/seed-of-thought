@@ -42,28 +42,25 @@
    cd backend
    npm run start:dev
    ```
-2. 데이터베이스 스키마를 수정할 경우, `prisma:dev` 명령어를 통해 **개발 환경**에 먼저 마이그레이션을 적용하고 클라이언트를 생성합니다.
+2. 데이터베이스 스키마를 수정할 경우, `db push` 명령어를 통해 데이터를 안전하게 지키면서 스키마를 적용하고 클라이언트를 생성합니다.
    ```bash
-   # 개발 DB 스키마 수정 반영 및 마이그레이션 생성
-   npm run prisma:dev migrate dev --name <migration_name>
-   
-   # 또는 스키마가 변경되지 않았고 클라이언트만 재생성할 경우
-   npm run prisma:dev generate
+   # 개발 DB 스키마 수정 반영 및 클라이언트 재생성
+   npx dotenv-cli -e .env.development -- npx prisma db push
    ```
 
 ### 3단계: 로컬 및 시뮬레이터 테스트 (Testing)
 * 프론트엔드 및 백엔드를 로컬에서 연동하여 비즈니스 로직을 검증합니다.
 * 이 단계에서 쓰거나 지우는 모든 데이터는 **개발 DB (Neon Dev)**에만 쌓이므로 안전하게 테스트를 진행합니다.
 
-### 4단계: 운영 배포 준비 및 마이그레이션 (Staging/Production Deploy)
-1. **운영 DB 스키마 업데이트 (Prisma Deploy)**:
-   운영 서버를 실행하기 전에 마이그레이션을 운영 DB에 안전하게 반영해야 합니다.
+### 4단계: 운영 배포 준비 및 스키마 반영 (Staging/Production Deploy)
+1. **운영 DB 스키마 업데이트 (Prisma DB Push)**:
+   운영 서버를 실행하기 전에 스키마 변경을 운영 DB에 안전하게 반영해야 합니다.
    ```bash
-   cd backend
-   npm run prisma:prod migrate deploy
+   # 운영 DB 스키마 반영 (기존 운영 데이터 유실 없이 안전하게 적용됨)
+   npx dotenv-cli -e .env.production -- npx prisma db push
    ```
    > [!IMPORTANT]
-   > `migrate dev`를 운영 환경에 사용하면 안 됩니다. 운영 환경에는 반드시 `migrate deploy` 명령어를 통해 생성된 마이그레이션 이력 파일들만 반영되도록 해야 합니다.
+   > 마이그레이션 이력이 없는 프로젝트 환경이므로 `migrate dev`나 `migrate deploy` 명령어를 사용해선 안 되며, 데이터를 잃지 않는 `db push`를 통해 반영해야 합니다.
 
 2. **백엔드 배포**:
    * Render 대시보드나 CLI 환경을 통해 배포를 진행합니다. (자동 빌드 트리거 혹은 `npm run render-deploy` 실행)
