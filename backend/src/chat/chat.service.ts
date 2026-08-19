@@ -87,7 +87,7 @@ export class ChatService {
                 이 문장에 대해 '생각 동료'로서 첫인사를 다정하게 건네줘. (~했니? ~구나? 말투 사용)`;
 
                 const completion = await this.groq.chat.completions.create({
-                    model: 'llama-3.1-8b-instant',
+                    model: 'groq/compound-mini',
                     temperature: 0.85,
                     messages: [
                         { role: 'system', content: systemContent },
@@ -139,7 +139,7 @@ export class ChatService {
         let aiText = "";
         try {
             const completion = await this.groq.chat.completions.create({
-                model: 'llama-3.1-8b-instant',
+                model: 'groq/compound-mini',
                 temperature: 0.85, // 창의성과 다양성을 위해 온도를 약간 높임
                 messages: messages,
             });
@@ -209,7 +209,7 @@ export class ChatService {
 
         try {
             const completion = await this.groq.chat.completions.create({
-                model: 'llama-3.1-8b-instant',
+                model: 'groq/compound',
                 messages: [{ role: 'user', content: analysisPrompt }],
                 response_format: { type: 'json_object' }
             });
