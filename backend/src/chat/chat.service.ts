@@ -209,7 +209,7 @@ export class ChatService {
 
         try {
             const completion = await this.groq.chat.completions.create({
-                model: 'groq/compound',
+                model: 'groq/compound-mini',
                 messages: [{ role: 'user', content: analysisPrompt }],
                 response_format: { type: 'json_object' }
             });

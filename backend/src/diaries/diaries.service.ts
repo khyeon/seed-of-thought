@@ -69,7 +69,7 @@ export class DiariesService {
                     { role: 'system', content: '너는 아이의 일기 작성을 도와주는 AI 전문가야. 반드시 JSON 형식으로만 응답해야 해.' },
                     { role: 'user', content: prompt }
                 ],
-                model: 'groq/compound',
+                model: 'groq/compound-mini',
                 response_format: { type: 'json_object' },
                 temperature: 0.6,
             });
