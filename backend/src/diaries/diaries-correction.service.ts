@@ -105,7 +105,7 @@ export class DiariesCorrectionService {
                         { role: 'system', content: '너는 초등학생 글쓰기 지도 전문 교사야. 반드시 JSON 형식으로만 응답해야 해.' },
                         { role: 'user', content: prompt }
                     ],
-                    model: 'llama-3.1-8b-instant',
+                    model: 'groq/compound',
                     response_format: { type: 'json_object' },
                     temperature: 0.5,
                 });
@@ -305,7 +305,7 @@ export class DiariesCorrectionService {
                         { role: 'system', content: '너는 다정하게 아이를 칭찬하고 격려해 주는 초등학생 독서 상담 교사야.' },
                         { role: 'user', content: prompt }
                     ],
-                    model: 'llama-3.1-8b-instant',
+                    model: 'groq/compound',
                     temperature: 0.7,
                 });
                 aiReport = completion.choices[0]?.message?.content || aiReport;
