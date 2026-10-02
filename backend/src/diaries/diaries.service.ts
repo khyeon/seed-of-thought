@@ -155,6 +155,27 @@ export class DiariesService {
         return diary;
     }
 
+    async updateDiaryContent(diaryId: string, content: string) {
+        const diary = await this.prisma.diary.findUnique({
+            where: { id: diaryId },
+        });
+
+        if (!diary) {
+            throw new HttpException('Diary not found', HttpStatus.NOT_FOUND);
+        }
+
+        // 1. Delete existing correction entries so previous polish data is reset
+        await this.prisma.diaryCorrection.deleteMany({
+            where: { diaryId },
+        });
+
+        // 2. Update core diary content
+        return this.prisma.diary.update({
+            where: { id: diaryId },
+            data: { content },
+        });
+    }
+
     async getDiariesByUser(userId: string, bookTitle?: string) {
         const where: any = { userId };
         if (bookTitle) {
