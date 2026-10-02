@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Get, Param, Query } from '@nestjs/common';
+import { Controller, Post, Body, Get, Param, Query, Patch } from '@nestjs/common';
 import { DiariesService } from './diaries.service';
 
 @Controller('diaries')
@@ -14,6 +14,14 @@ export class DiariesController {
     async save(@Body() body: any) {
         console.log('DiariesController: save called with body keys:', Object.keys(body));
         return this.diariesService.saveDiary(body);
+    }
+
+    @Patch(':id')
+    async updateContent(
+        @Param('id') diaryId: string,
+        @Body() body: { content: string },
+    ) {
+        return this.diariesService.updateDiaryContent(diaryId, body.content);
     }
 
     @Get()

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { ScrollView, View, Text, TouchableOpacity, Image, Alert, ActivityIndicator, Platform } from 'react-native';
+import { ScrollView, View, Text, TouchableOpacity, Image, Alert, ActivityIndicator, Platform, Modal, TextInput, KeyboardAvoidingView } from 'react-native';
 import styled from 'styled-components/native';
 import { theme } from '../styles/theme';
-import { ChevronLeft, Calendar, Book, Quote, MessageCircle, Sparkles } from 'lucide-react-native';
+import { ChevronLeft, Calendar, Book, Quote, MessageCircle, Sparkles, Edit3 } from 'lucide-react-native';
 import axios from 'axios';
 import { API_URL } from '../config/apiConfig';
 
@@ -179,6 +179,13 @@ const DiaryDetailScreen = ({ navigation, route }: any) => {
   const [correctionData, setCorrectionData] = useState<any>(null);
   const [viewMode, setViewMode] = useState<'original' | 'corrected'>('original');
   const [loadingCorrection, setLoadingCorrection] = useState(false);
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [selectedSentence, setSelectedSentence] = useState<{ text: string; index: number }>({ text: '', index: 0 });
+  const [manualInput, setManualInput] = useState('');
+  const [savingManual, setSavingManual] = useState(false);
+  const [fullContentModalVisible, setFullContentModalVisible] = useState(false);
+  const [fullContentInput, setFullContentInput] = useState('');
+  const [savingFullContent, setSavingFullContent] = useState(false);
 
   useEffect(() => {
     fetchCorrection();
@@ -236,20 +243,97 @@ const DiaryDetailScreen = ({ navigation, route }: any) => {
     }
   };
 
+  const openDirectEditModal = (sentence: string, index: number) => {
+    setSelectedSentence({ text: sentence, index });
+    setManualInput(sentence);
+    setEditModalVisible(true);
+  };
+
+  const handleSaveManualDirectEdit = async () => {
+    if (!manualInput.trim()) return;
+    setSavingManual(true);
+    try {
+      await axios.post(`${API_URL}/diaries/${diary.id}/correction/analyze`);
+      const manualRes = await axios.post(`${API_URL}/diaries/${diary.id}/correction/manual`, {
+        sentenceIndex: selectedSentence.index,
+        originalSentence: selectedSentence.text,
+        userHint: '직접 수정한 문장입니다.'
+      });
+      await axios.patch(`${API_URL}/diaries/${diary.id}/correction/items/${manualRes.data.id}`, {
+        correctedSentence: manualInput.trim(),
+        status: 'RESOLVED'
+      });
+      await axios.post(`${API_URL}/diaries/${diary.id}/correction/complete`);
+      await fetchCorrection();
+      setEditModalVisible(false);
+      if (Platform.OS === 'web') {
+        window.alert('문장 수정이 완료되었습니다! 🍎');
+      } else {
+        Alert.alert('저장 완료', '문장 수정이 완료되었습니다! 🍎');
+      }
+    } catch (err) {
+      console.error(err);
+      if (Platform.OS === 'web') {
+        window.alert('문장 수정에 실패했습니다.');
+      } else {
+        Alert.alert('오류', '문장 수정에 실패했습니다.');
+      }
+    } finally {
+      setSavingManual(false);
+    }
+  };
+
+  const handleSaveFullContentEdit = async () => {
+    if (!fullContentInput.trim()) return;
+    setSavingFullContent(true);
+    try {
+      const res = await axios.patch(`${API_URL}/diaries/${diary.id}`, {
+        content: fullContentInput.trim(),
+      });
+      diary.content = res.data.content;
+      setCorrectionData(null);
+      setViewMode('original');
+      setFullContentModalVisible(false);
+
+      if (Platform.OS === 'web') {
+        window.alert('열매 전체 글이 수정되었습니다! 이전 다듬기 정보는 초기화되었으며, 필요할 때 언제든 다시 다듬을 수 있습니다. 🍎');
+      } else {
+        Alert.alert('수정 완료', '열매 전체 글이 수정되었습니다!\n이전 다듬기 정보는 초기화되었으며, 필요할 때 언제든 다시 다듬을 수 있습니다. 🍎');
+      }
+    } catch (err) {
+      console.error(err);
+      if (Platform.OS === 'web') {
+        window.alert('전체 글 수정에 실패했습니다.');
+      } else {
+        Alert.alert('오류', '전체 글 수정에 실패했습니다.');
+      }
+    } finally {
+      setSavingFullContent(false);
+    }
+  };
+
   const handleSentencePress = (sentence: string, index: number) => {
     if (Platform.OS === 'web') {
-      const confirm = window.confirm(`[문장 다듬기]\n\n"${sentence}"\n\n이 문장을 직접 고치거나 AI와 함께 다듬어 볼까요?`);
-      if (confirm) {
+      const choice = window.confirm(
+        `[문장 다듬기 및 수정]\n\n"${sentence}"\n\n[확인]: AI와 함께 다듬기 화면으로 이동\n[취소]: 내가 직접 문장 고치기`
+      );
+      if (choice) {
         startCorrectionProcess(sentence, index);
+      } else {
+        openDirectEditModal(sentence, index);
       }
     } else {
       Alert.alert(
-        '문장 다듬기',
-        `"${sentence}"\n\n이 문장을 직접 고치거나 AI와 함께 다듬어 볼까요?`,
+        '문장 다듬기 및 수정',
+        `"${sentence}"\n\n원하시는 방식을 선택해 주세요.`,
         [
-          { text: '취소', style: 'cancel' },
+          { text: '닫기', style: 'cancel' },
           {
-            text: '다듬기 시작하기 ✏️',
+            text: '📝 내가 직접 고치기',
+            onPress: () => openDirectEditModal(sentence, index)
+          },
+          {
+            text: '✏️ AI와 함께 다듬기',
             onPress: () => startCorrectionProcess(sentence, index)
           }
         ]
@@ -339,7 +423,7 @@ const DiaryDetailScreen = ({ navigation, route }: any) => {
       const parts = tempText.split(regex);
 
       return (
-        <View style={{ flexWrap: 'wrap', flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ width: '100%', flexDirection: 'column' }}>
           {parts.map((part, index) => {
             if (itemMap.has(part)) {
               const item = itemMap.get(part);
@@ -347,16 +431,24 @@ const DiaryDetailScreen = ({ navigation, route }: any) => {
                 <TouchableOpacity 
                   key={`corr-touch-${index}`}
                   onPress={() => handleCorrectedSentencePress(item.correctedSentence, item.originalSentence)}
-                  style={{ backgroundColor: '#FFF9C4', paddingHorizontal: 4, marginVertical: 2, borderRadius: 4, marginRight: 4 }}
+                  style={{
+                    backgroundColor: '#FFF9C4',
+                    paddingHorizontal: 10,
+                    paddingVertical: 8,
+                    marginVertical: 4,
+                    borderRadius: 8,
+                    width: '100%',
+                    alignSelf: 'stretch',
+                  }}
                 >
-                  <Text style={{ fontSize: 16, color: theme.colors.text.primary, fontWeight: 'bold', textDecorationLine: 'underline' }}>
+                  <Text style={{ fontSize: 16, color: theme.colors.text.primary, fontWeight: 'bold', textDecorationLine: 'underline', lineHeight: 24, flexWrap: 'wrap' }}>
                     {item.correctedSentence}
                   </Text>
                 </TouchableOpacity>
               );
             }
             return (
-              <Text key={`corr-flat-${index}`} style={{ fontSize: 16, color: theme.colors.text.primary, lineHeight: 26 }}>
+              <Text key={`corr-flat-${index}`} style={{ fontSize: 16, color: theme.colors.text.primary, lineHeight: 26, marginVertical: 2 }}>
                 {part}{' '}
               </Text>
             );
@@ -367,14 +459,22 @@ const DiaryDetailScreen = ({ navigation, route }: any) => {
 
     // Original Mode (clickable sentences)
     return (
-      <View style={{ flexWrap: 'wrap', flexDirection: 'row', alignItems: 'center' }}>
+      <View style={{ width: '100%', flexDirection: 'column' }}>
         {originalSentences.map((sentence, index) => (
           <TouchableOpacity
             key={`orig-touch-${index}`}
             onPress={() => handleSentencePress(sentence, index)}
-            style={{ backgroundColor: '#ECEFF1', paddingHorizontal: 4, marginVertical: 2, borderRadius: 4, marginRight: 4 }}
+            style={{
+              backgroundColor: '#ECEFF1',
+              paddingHorizontal: 10,
+              paddingVertical: 8,
+              marginVertical: 4,
+              borderRadius: 8,
+              width: '100%',
+              alignSelf: 'stretch',
+            }}
           >
-            <Text style={{ fontSize: 16, color: theme.colors.text.primary, lineHeight: 26 }}>
+            <Text style={{ fontSize: 16, color: theme.colors.text.primary, lineHeight: 24, flexWrap: 'wrap' }}>
               {sentence}
             </Text>
           </TouchableOpacity>
@@ -433,10 +533,31 @@ const DiaryDetailScreen = ({ navigation, route }: any) => {
             <SentenceText>"{diary.chatRoom?.seed?.sentence || '선택한 문장이 없습니다.'}"</SentenceText>
           </SentenceBox>
 
-          <SectionTitle>
-            <Book size={16} color={theme.colors.primary} />
-            <SectionLabel>나의 생각 열매</SectionLabel>
-          </SectionTitle>
+          <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginTop: 12, marginBottom: 8 }}>
+            <SectionTitle style={{ marginBottom: 0 }}>
+              <Book size={16} color={theme.colors.primary} />
+              <SectionLabel>나의 생각 열매</SectionLabel>
+            </SectionTitle>
+            <TouchableOpacity
+              onPress={() => {
+                setFullContentInput(diary.content || '');
+                setFullContentModalVisible(true);
+              }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                backgroundColor: '#F1F8E9',
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 6,
+                borderWidth: 1,
+                borderColor: '#C8E6C9'
+              }}
+            >
+              <Edit3 size={13} color={theme.colors.primary} style={{ marginRight: 4 }} />
+              <Text style={{ fontSize: 13, color: theme.colors.primary, fontWeight: 'bold' }}>전체 글 수정</Text>
+            </TouchableOpacity>
+          </View>
           {renderDiaryContent()}
 
           {viewMode === 'original' && (
@@ -524,6 +645,132 @@ const DiaryDetailScreen = ({ navigation, route }: any) => {
           <Text style={{ color: theme.colors.text.secondary, fontWeight: 'bold' }}>목록으로 돌아가기</Text>
         </TouchableOpacity>
       </Content>
+
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setEditModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}
+        >
+          <View style={{ width: '100%', maxWidth: 450, backgroundColor: 'white', borderRadius: 16, padding: 20, ...theme.shadows.soft }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.text.primary, marginBottom: 12 }}>
+              문장 직접 고치기 📝
+            </Text>
+            <Text style={{ fontSize: 13, color: theme.colors.text.disabled, marginBottom: 6 }}>
+              원래 쓴 문장:
+            </Text>
+            <View style={{ backgroundColor: '#ECEFF1', padding: 12, borderRadius: 8, marginBottom: 16 }}>
+              <Text style={{ fontSize: 14, color: theme.colors.text.secondary, fontStyle: 'italic', lineHeight: 20 }}>
+                "{selectedSentence.text}"
+              </Text>
+            </View>
+            <Text style={{ fontSize: 14, color: theme.colors.text.primary, fontWeight: 'bold', marginBottom: 8 }}>
+              어떻게 고치고 싶나요?
+            </Text>
+            <TextInput
+              style={{
+                borderWidth: 1,
+                borderColor: theme.colors.secondary,
+                borderRadius: 8,
+                padding: 12,
+                fontSize: 15,
+                lineHeight: 22,
+                minHeight: 90,
+                textAlignVertical: 'top',
+                marginBottom: 20,
+                color: theme.colors.text.primary,
+                backgroundColor: '#FAFAFA'
+              }}
+              multiline
+              value={manualInput}
+              onChangeText={setManualInput}
+              placeholder="수정할 내용을 자유롭게 입력하세요."
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <TouchableOpacity
+                onPress={() => setEditModalVisible(false)}
+                style={{ paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, marginRight: 8 }}
+              >
+                <Text style={{ color: theme.colors.text.secondary, fontWeight: 'bold' }}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveManualDirectEdit}
+                disabled={savingManual}
+                style={{ backgroundColor: theme.colors.primary, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 }}
+              >
+                {savingManual ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>저장하기</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
+
+      <Modal
+        visible={fullContentModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFullContentModalVisible(false)}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+          style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'center', alignItems: 'center', padding: 20 }}
+        >
+          <View style={{ width: '100%', maxWidth: 500, backgroundColor: 'white', borderRadius: 16, padding: 20, ...theme.shadows.soft }}>
+            <Text style={{ fontSize: 18, fontWeight: 'bold', color: theme.colors.text.primary, marginBottom: 8 }}>
+              열매 전체 글 수정하기 📝
+            </Text>
+            <Text style={{ fontSize: 12, color: '#E65100', backgroundColor: '#FFF3E0', padding: 10, borderRadius: 6, marginBottom: 14, lineHeight: 18 }}>
+              💡 전체 글을 수정하여 저장하면 이전의 AI 다듬기 이력은 초기화됩니다. 필요할 때 언제든 '생각 다듬으러 가기'를 통해 새로 AI 다듬기를 시작하실 수 있습니다.
+            </Text>
+            <TextInput
+              style={{
+                borderWidth: 1,
+                borderColor: theme.colors.secondary,
+                borderRadius: 8,
+                padding: 12,
+                fontSize: 15,
+                lineHeight: 24,
+                minHeight: 160,
+                textAlignVertical: 'top',
+                marginBottom: 20,
+                color: theme.colors.text.primary,
+                backgroundColor: '#FAFAFA'
+              }}
+              multiline
+              value={fullContentInput}
+              onChangeText={setFullContentInput}
+              placeholder="생각 열매 전체 내용을 입력하세요."
+            />
+            <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center' }}>
+              <TouchableOpacity
+                onPress={() => setFullContentModalVisible(false)}
+                style={{ paddingVertical: 10, paddingHorizontal: 16, borderRadius: 8, marginRight: 8 }}
+              >
+                <Text style={{ color: theme.colors.text.secondary, fontWeight: 'bold' }}>취소</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={handleSaveFullContentEdit}
+                disabled={savingFullContent}
+                style={{ backgroundColor: theme.colors.primary, paddingVertical: 10, paddingHorizontal: 20, borderRadius: 8 }}
+              >
+                {savingFullContent ? (
+                  <ActivityIndicator color="white" />
+                ) : (
+                  <Text style={{ color: 'white', fontWeight: 'bold' }}>전체 글 저장하기</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
+      </Modal>
     </Container>
   );
 };
